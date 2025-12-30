@@ -127,31 +127,21 @@ func (c *baseClient) Close() error {
 
 func (c *baseClient) receiveLoop(msgHandler rawMessageHandler, onReconnect func()) {
 	for {
-		if c.ctx.Err() != nil {
-			// 如果 context 已取消且不是主动关闭，则尝试重连
+		msg, err := c.stream.Recv()
+		if err != nil {
 			c.mu.RLock()
 			closed := c.isClosed
 			c.mu.RUnlock()
+
+			// 如果是主动关闭，则直接退出，不记录错误日志
 			if closed {
 				return
 			}
-			c.reconnect(msgHandler, onReconnect)
-			return
-		}
 
-		msg, err := c.stream.Recv()
-		if err != nil {
 			if err == io.EOF {
 				log.Info("服务器已关闭连接，尝试重连...")
 			} else {
 				log.Error("接收流消息失败，准备重连", "error", err)
-			}
-			
-			c.mu.RLock()
-			closed := c.isClosed
-			c.mu.RUnlock()
-			if closed {
-				return
 			}
 
 			c.reconnect(msgHandler, onReconnect)
