@@ -61,7 +61,9 @@ example-group:
 
 # 性能压测
 bench-prod: build
-	@bin/benchmark -mode prod -c 50 -n 200000 -b 100 -s 512
+	make build
+	@bin/benchmark -mode prod -c 50 -n 200000 -b 500 -s 512
 
 bench-cons: build
+	make build
 	@bin/benchmark -mode cons -c 10

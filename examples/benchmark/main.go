@@ -36,12 +36,6 @@ func main() {
 
 func runProducerBench() {
 	payload := make([]byte, *msgSize)
-	producer, err := client.NewProducer(&client.ProducerConfig{ServerAddr: *addr})
-	if err != nil {
-		fmt.Printf("创建生产者失败: %v\n", err)
-		return
-	}
-	defer producer.Close()
 
 	fmt.Printf("=== GMQ 生产吞吐量压测 ===\n")
 	fmt.Printf("地址: %s | Topic: %s\n", *addr, *topic)
@@ -53,10 +47,36 @@ func runProducerBench() {
 	start := time.Now()
 	var wg sync.WaitGroup
 
+	// 启动进度报告协程
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			current := atomic.LoadInt64(&count)
+			pct := float64(current) / float64(*total) * 100
+			elapsed := time.Since(start).Seconds()
+			tps := float64(current) / elapsed
+			fmt.Printf("发送进度: %.2f%% (%d/%d) | 当前速率: %.2f msg/s\n", pct, current, *total, tps)
+			if current >= int64(*total) {
+				return
+			}
+		}
+	}()
+
 	for i := 0; i < *concurrency; i++ {
 		wg.Add(1)
-		go func() {
+		go func(id int) {
 			defer wg.Done()
+			producer, err := client.NewProducer(&client.ProducerConfig{
+				ServerAddr: *addr,
+				ClientID:   fmt.Sprintf("bench-prod-%d", id),
+			})
+			if err != nil {
+				fmt.Printf("创建生产者失败: %v\n", err)
+				return
+			}
+			defer producer.Close()
+
 			for {
 				if atomic.LoadInt64(&count) >= int64(*total) {
 					return
@@ -78,7 +98,7 @@ func runProducerBench() {
 					atomic.AddInt64(&count, int64(*batchSize))
 				}
 			}
-		}()
+		}(i)
 	}
 
 	wg.Wait()

@@ -138,6 +138,9 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 		consumerGroup    string
 		subscribedTopics []string
 		pullInterval     = 100 * time.Millisecond
+		// 内存中维护每个分区的最后推送偏移量，防止重复拉取
+		lastSentOffsets = make(map[string]int64) // key: topic-partition
+		offsetMu        sync.Mutex
 	)
 
 	messageChan := make(chan *pb.ConsumeMessage, 1000)
@@ -200,16 +203,26 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 					}
 
 					for _, partID := range myPartitions {
-						offsetResp, err := s.storageClient.GetOffset(ctx, &storagepb.GetOffsetRequest{
-							ConsumerGroup: consumerGroup,
-							Topic:         topic,
-							PartitionId:   partID,
-						})
-						if err != nil || !offsetResp.Success {
-							continue
+						offsetKey := fmt.Sprintf("%s-%d", topic, partID)
+
+						// 优先使用内存中的偏移量，如果没有则去存储查
+						offsetMu.Lock()
+						currentOffset, ok := lastSentOffsets[offsetKey]
+						offsetMu.Unlock()
+
+						if !ok {
+							offsetResp, err := s.storageClient.GetOffset(ctx, &storagepb.GetOffsetRequest{
+								ConsumerGroup: consumerGroup,
+								Topic:         topic,
+								PartitionId:   partID,
+							})
+							if err != nil || !offsetResp.Success {
+								continue
+							}
+							currentOffset = offsetResp.Offset
 						}
 
-						// 如果当前分区仍有未处理完的消息在 Channel 中，跳过本次拉取，防止撑爆内存
+						// 如果当前分区仍有未处理完的消息在 Channel 中，跳过本次拉取
 						if len(messageChan) > 800 {
 							break
 						}
@@ -217,7 +230,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 						resp, err := s.storageClient.ReadMessages(ctx, &storagepb.ReadMessagesRequest{
 							Topic:       topic,
 							PartitionId: partID,
-							Offset:      offsetResp.Offset,
+							Offset:      currentOffset,
 							Limit:       1000,
 						})
 						if err != nil || !resp.Success || len(resp.Messages) == 0 {
@@ -227,6 +240,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 						batch := &pb.ConsumeMessage{
 							Items: make([]*pb.MessageItem, len(resp.Messages)),
 						}
+						var maxOffset int64
 						for i, m := range resp.Messages {
 							batch.Items[i] = &pb.MessageItem{
 								MessageId:   m.Id,
@@ -238,13 +252,19 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 								Timestamp:   m.Timestamp,
 								Qos:         pb.QoS(m.Qos),
 							}
+							if m.Offset > maxOffset {
+								maxOffset = m.Offset
+							}
 						}
 
 						select {
 						case messageChan <- batch:
+							// 推送成功后，立即更新内存 Offset，确保下次拉取不重复
+							offsetMu.Lock()
+							lastSentOffsets[offsetKey] = maxOffset
+							offsetMu.Unlock()
 						default:
-							// 如果 Channel 满了，说明推送协程忙，本次拉取的数据暂时放弃，等待下次轮询
-							// 这样可以防止拉取协程被阻塞
+							// 缓冲区满，暂缓推送
 							log.WithContext(ctx).Warn("消息缓冲区已满，暂缓推送", "topic", topic, "partID", partID)
 						}
 					}
