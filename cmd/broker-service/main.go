@@ -205,12 +205,13 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 					for _, partID := range myPartitions {
 						offsetKey := fmt.Sprintf("%s-%d", topic, partID)
 
-						// 优先使用内存中的偏移量，如果没有则去存储查
+						// 严格逻辑：优先使用内存中的 lastSentOffsets，确保同一流会话内不重复
 						offsetMu.Lock()
 						currentOffset, ok := lastSentOffsets[offsetKey]
 						offsetMu.Unlock()
 
 						if !ok {
+							// 内存中没有，说明是新连接或新分配的分区，从存储获取已确认的 Offset
 							offsetResp, err := s.storageClient.GetOffset(ctx, &storagepb.GetOffsetRequest{
 								ConsumerGroup: consumerGroup,
 								Topic:         topic,
@@ -222,11 +223,12 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 							currentOffset = offsetResp.Offset
 						}
 
-						// 如果当前分区仍有未处理完的消息在 Channel 中，跳过本次拉取
+						// 缓冲区流控
 						if len(messageChan) > 800 {
 							break
 						}
 
+						// 从 currentOffset 之后读取
 						resp, err := s.storageClient.ReadMessages(ctx, &storagepb.ReadMessagesRequest{
 							Topic:       topic,
 							PartitionId: partID,
@@ -240,7 +242,9 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 						batch := &pb.ConsumeMessage{
 							Items: make([]*pb.MessageItem, len(resp.Messages)),
 						}
-						var maxOffset int64
+
+						// 记录本次批次的最大偏移量
+						var maxOffset int64 = currentOffset
 						for i, m := range resp.Messages {
 							batch.Items[i] = &pb.MessageItem{
 								MessageId:   m.Id,
@@ -257,14 +261,17 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 							}
 						}
 
+						// 只有成功送入待发送队列，才推进内存偏移量
 						select {
 						case messageChan <- batch:
-							// 推送成功后，立即更新内存 Offset，确保下次拉取不重复
 							offsetMu.Lock()
-							lastSentOffsets[offsetKey] = maxOffset
+							// 二次校验，确保 Offset 单调递增
+							if maxOffset > lastSentOffsets[offsetKey] {
+								lastSentOffsets[offsetKey] = maxOffset
+							}
 							offsetMu.Unlock()
 						default:
-							// 缓冲区满，暂缓推送
+							// 缓冲区满，不推进 Offset，下次轮询重试
 							log.WithContext(ctx).Warn("消息缓冲区已满，暂缓推送", "topic", topic, "partID", partID)
 						}
 					}
