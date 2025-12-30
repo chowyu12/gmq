@@ -3,8 +3,8 @@ module github.com/chowyu12/gmq
 go 1.25.3
 
 require (
-	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.17.2
+	github.com/rs/xid v1.6.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.1
 )

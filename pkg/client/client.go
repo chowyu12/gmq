@@ -9,7 +9,7 @@ import (
 
 	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto"
-	"github.com/google/uuid"
+	"github.com/rs/xid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -264,14 +264,14 @@ func NewProducer(cfg *ProducerConfig) (*Producer, error) {
 		return nil, err
 	}
 	if cfg.ClientID == "" {
-		bc.clientID = "p-" + uuid.New().String()[:8]
+		bc.clientID = "p-" + xid.New().String()
 	} else {
 		bc.clientID = cfg.ClientID
 	}
 
 	producerID := cfg.ProducerID
 	if producerID == "" {
-		producerID = "prod-" + uuid.New().String()[:8]
+		producerID = "prod-" + xid.New().String()
 	}
 
 	p := &Producer{
@@ -298,7 +298,7 @@ func (p *Producer) Publish(ctx context.Context, items []*pb.PublishItem) (*pb.Pu
 	p.seqMu.Unlock()
 
 	req := &pb.PublishRequest{
-		RequestId: uuid.New().String(),
+		RequestId: xid.New().String(),
 		Items:     items,
 	}
 
@@ -387,12 +387,12 @@ func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 
 	bc.consumerGroup = cfg.ConsumerGroup
 	if cfg.ConsumerID == "" {
-		bc.consumerID = "c-" + uuid.New().String()[:8]
+		bc.consumerID = "c-" + xid.New().String()
 	} else {
 		bc.consumerID = cfg.ConsumerID
 	}
 	if cfg.ClientID == "" {
-		bc.clientID = "cli-" + uuid.New().String()[:8]
+		bc.clientID = "cli-" + xid.New().String()
 	} else {
 		bc.clientID = cfg.ClientID
 	}
@@ -477,7 +477,7 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, opts ...Subscrib
 	c.subMu.Unlock()
 
 	req := &pb.SubscribeRequest{
-		RequestId:      uuid.New().String(),
+		RequestId:      xid.New().String(),
 		Topic:          topic,
 		ConsumerGroup:  c.consumerGroup,
 		ConsumerId:     c.consumerID,
@@ -542,7 +542,7 @@ func (c *Consumer) Ack(ctx context.Context, items []*pb.MessageItem) error {
 	}
 
 	req := &pb.AckRequest{
-		RequestId:     uuid.New().String(),
+		RequestId:     xid.New().String(),
 		ConsumerGroup: c.consumerGroup,
 		ConsumerId:    c.consumerID,
 		Items:         ackItems,

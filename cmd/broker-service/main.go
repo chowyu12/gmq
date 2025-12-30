@@ -16,7 +16,7 @@ import (
 	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto"
 	storagepb "github.com/chowyu12/gmq/proto/storage"
-	"github.com/google/uuid"
+	"github.com/rs/xid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -128,7 +128,7 @@ func (s *BrokerServer) ensureTopicExists(ctx context.Context, topic string) erro
 // Stream 处理客户端双向流连接
 func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 	ctx := stream.Context()
-	streamID := uuid.New().String()[:8]
+	streamID := xid.New().String()
 
 	log.WithContext(ctx).Info("新客户端流连接", "streamID", streamID)
 	defer log.WithContext(ctx).Info("客户端流断开", "streamID", streamID)
@@ -314,13 +314,13 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 			hash := fnv.New32a()
 			key := item.PartitionKey
 			if key == "" {
-				key = uuid.New().String()
+				key = xid.New().String()
 			}
 			hash.Write([]byte(key))
 			partitionID = int32(hash.Sum32() % uint32(s.partitions))
 		}
 
-		msgID := uuid.New().String()
+		msgID := xid.New().String()
 		storageMsgs[i] = &storagepb.Message{
 			Id:             msgID,
 			Topic:          item.Topic,
