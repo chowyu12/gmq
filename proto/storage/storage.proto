@@ -7,16 +7,16 @@ option go_package = "github.com/chowyu12/gmq/proto/storage;storage";
 // Storage Service - 存储服务接口
 service StorageService {
   // --- 消息接口 ---
-  rpc WriteMessage(WriteMessageRequest) returns (WriteMessageResponse);
+  rpc WriteMessages(WriteMessagesRequest) returns (WriteMessagesResponse);
   rpc ReadMessages(ReadMessagesRequest) returns (ReadMessagesResponse);
   rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse);
   rpc GetPartition(GetPartitionRequest) returns (GetPartitionResponse);
   rpc UpdateOffset(UpdateOffsetRequest) returns (UpdateOffsetResponse);
   rpc GetOffset(GetOffsetRequest) returns (GetOffsetResponse);
   rpc ListPartitions(ListPartitionsRequest) returns (ListPartitionsResponse);
-  rpc SetTTL(SetTTLRequest) returns (SetTTLResponse); // 新增
+  rpc SetTTL(SetTTLRequest) returns (SetTTLResponse);
 
-  // --- 新增：消费者和消费组状态管理 (强一致性存储) ---
+  // --- 消费者和消费组状态管理 (强一致性存储) ---
   
   // 保存/更新消费者信息
   rpc SaveConsumer(SaveConsumerRequest) returns (SaveConsumerResponse);
@@ -46,14 +46,14 @@ message Message {
   int64 sequence_number = 10;
 }
 
-message WriteMessageRequest {
-  Message message = 1;
+message WriteMessagesRequest {
+  repeated Message messages = 1;
 }
 
-message WriteMessageResponse {
+message WriteMessagesResponse {
   bool success = 1;
   string error_message = 2;
-  int64 offset = 3;
+  repeated int64 offsets = 3;
 }
 
 message ReadMessagesRequest {

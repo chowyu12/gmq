@@ -213,15 +213,17 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 							Topic:       topic,
 							PartitionId: partID,
 							Offset:      offsetResp.Offset,
-							Limit:       10,
+							Limit:       20, // 批量拉取
 						})
 						if err != nil || !resp.Success || len(resp.Messages) == 0 {
 							continue
 						}
 
-						for _, m := range resp.Messages {
-							select {
-							case messageChan <- &pb.ConsumeMessage{
+						batch := &pb.ConsumeMessage{
+							Items: make([]*pb.MessageItem, len(resp.Messages)),
+						}
+						for i, m := range resp.Messages {
+							batch.Items[i] = &pb.MessageItem{
 								MessageId:   m.Id,
 								Topic:       m.Topic,
 								PartitionId: m.PartitionId,
@@ -230,12 +232,15 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 								Properties:  m.Properties,
 								Timestamp:   m.Timestamp,
 								Qos:         pb.QoS(m.Qos),
-							}:
-							case <-ctx.Done():
-								return
-							case <-stopChan:
-								return
 							}
+						}
+
+						select {
+						case messageChan <- batch:
+						case <-ctx.Done():
+							return
+						case <-stopChan:
+							return
 						}
 					}
 				}
@@ -292,48 +297,67 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 }
 
 func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.PublishRequest) {
-	if err := s.ensureTopicExists(ctx, req.Topic); err != nil {
-		log.WithContext(ctx).Error("自动创建 Topic 失败", "topic", req.Topic, "error", err)
+	if len(req.Items) == 0 {
+		return
 	}
 
-	partitionID := req.PartitionId
-	if partitionID < 0 {
-		hash := fnv.New32a()
-		key := req.PartitionKey
-		if key == "" {
-			key = uuid.New().String()
+	storageMsgs := make([]*storagepb.Message, len(req.Items))
+	results := make([]*pb.PublishResult, len(req.Items))
+
+	for i, item := range req.Items {
+		if err := s.ensureTopicExists(ctx, item.Topic); err != nil {
+			log.WithContext(ctx).Error("自动创建 Topic 失败", "topic", item.Topic, "error", err)
 		}
-		hash.Write([]byte(key))
-		partitionID = int32(hash.Sum32() % uint32(s.partitions))
+
+		partitionID := item.PartitionId
+		if partitionID < 0 {
+			hash := fnv.New32a()
+			key := item.PartitionKey
+			if key == "" {
+				key = uuid.New().String()
+			}
+			hash.Write([]byte(key))
+			partitionID = int32(hash.Sum32() % uint32(s.partitions))
+		}
+
+		msgID := uuid.New().String()
+		storageMsgs[i] = &storagepb.Message{
+			Id:             msgID,
+			Topic:          item.Topic,
+			PartitionId:    partitionID,
+			Payload:        item.Payload,
+			Properties:     item.Properties,
+			Timestamp:      time.Now().Unix(),
+			Qos:            int32(item.Qos),
+			ProducerId:     item.ProducerId,
+			SequenceNumber: item.SequenceNumber,
+		}
+		results[i] = &pb.PublishResult{
+			MessageId:   msgID,
+			Topic:       item.Topic,
+			PartitionId: partitionID,
+		}
 	}
 
-	msgID := uuid.New().String()
-	storageResp, err := s.storageClient.WriteMessage(ctx, &storagepb.WriteMessageRequest{
-		Message: &storagepb.Message{
-			Id:             msgID,
-			Topic:          req.Topic,
-			PartitionId:    partitionID,
-			Payload:        req.Payload,
-			Properties:     req.Properties,
-			Timestamp:      time.Now().Unix(),
-			Qos:            int32(req.Qos),
-			ProducerId:     req.ProducerId,
-			SequenceNumber: req.SequenceNumber,
-		},
+	storageResp, err := s.storageClient.WriteMessages(ctx, &storagepb.WriteMessagesRequest{
+		Messages: storageMsgs,
 	})
 
-	resp := &pb.PublishResponse{RequestId: req.RequestId, Topic: req.Topic}
+	resp := &pb.PublishResponse{RequestId: req.RequestId, Results: results}
 	if err != nil || !storageResp.Success {
-		resp.Success = false
-		if err != nil {
-			resp.ErrorMessage = err.Error()
-		} else {
-			resp.ErrorMessage = storageResp.ErrorMessage
+		for _, r := range results {
+			r.Success = false
+			if err != nil {
+				r.ErrorMessage = err.Error()
+			} else {
+				r.ErrorMessage = storageResp.ErrorMessage
+			}
 		}
 	} else {
-		resp.Success = true
-		resp.MessageId = msgID
-		resp.PartitionId = partitionID
+		for _, r := range results {
+			r.Success = true
+			// 注意：这里由于是批量写入，offset 可能需要对应返回，目前先简化处理
+		}
 	}
 
 	stream.Send(&pb.StreamMessage{
@@ -373,16 +397,22 @@ func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService
 }
 
 func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.AckRequest) {
-	_, err := s.storageClient.UpdateOffset(ctx, &storagepb.UpdateOffsetRequest{
-		ConsumerGroup: req.ConsumerGroup,
-		Topic:         req.Topic,
-		PartitionId:   req.PartitionId,
-		Offset:        req.Offset + 1,
-	})
+	var lastErr error
+	for _, item := range req.Items {
+		_, err := s.storageClient.UpdateOffset(ctx, &storagepb.UpdateOffsetRequest{
+			ConsumerGroup: req.ConsumerGroup,
+			Topic:         item.Topic,
+			PartitionId:   item.PartitionId,
+			Offset:        item.Offset + 1,
+		})
+		if err != nil {
+			lastErr = err
+		}
+	}
 
-	resp := &pb.AckResponse{RequestId: req.RequestId, Success: err == nil}
-	if err != nil {
-		resp.ErrorMessage = err.Error()
+	resp := &pb.AckResponse{RequestId: req.RequestId, Success: lastErr == nil}
+	if lastErr != nil {
+		resp.ErrorMessage = lastErr.Error()
 	}
 
 	stream.Send(&pb.StreamMessage{

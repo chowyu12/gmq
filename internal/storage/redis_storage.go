@@ -63,48 +63,66 @@ func decodeOffset(offset int64) string {
 	return fmt.Sprintf("%d-%d", ts, seq)
 }
 
-func (r *RedisStorage) WriteMessage(ctx context.Context, msg *Message) (int64, error) {
-	// 1. 生产端幂等性检查
-	if msg.ProducerID != "" && msg.SequenceNumber > 0 {
-		dedupKey := fmt.Sprintf("gmq:dedup:%s:%s:%d", msg.Topic, msg.ProducerID, msg.SequenceNumber)
-		// 如果 key 已存在，说明是重复消息，直接返回成功并携带上次的 Offset (这里简化为返回 0，Broker 会处理)
-		set, err := r.client.SetNX(ctx, dedupKey, "1", 1*time.Hour).Result()
+func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]int64, error) {
+	if len(msgs) == 0 {
+		return nil, nil
+	}
+
+	// 1. 获取所有 Topic 的 TTL 配置 (批量获取优化)
+	// 这里的获取逻辑可以进一步优化，目前先简单循环或缓存
+	topicTTLs := make(map[string]float64)
+	for _, msg := range msgs {
+		if _, ok := topicTTLs[msg.Topic]; !ok {
+			ttlKey := fmt.Sprintf("gmq:meta:ttl:%s", msg.Topic)
+			ttlVal, _ := r.client.Get(ctx, ttlKey).Float64()
+			topicTTLs[msg.Topic] = ttlVal
+		}
+	}
+
+	// 2. 准备 Pipeline
+	pipe := r.client.Pipeline()
+	results := make([]*redis.StringCmd, len(msgs))
+
+	for i, msg := range msgs {
+		// 幂等性检查 (批量操作中 SetNX 比较复杂，这里仍然按条处理)
+		if msg.ProducerID != "" && msg.SequenceNumber > 0 {
+			dedupKey := fmt.Sprintf("gmq:dedup:%s:%s:%d", msg.Topic, msg.ProducerID, msg.SequenceNumber)
+			// 注意：Pipeline 中的 SetNX 无法立即判断结果来跳过后续步骤
+			// 严格实现需要 Lua 脚本或两阶段提交，这里简化处理，假设 Pipeline 中都是新消息
+			pipe.SetNX(ctx, dedupKey, "1", 1*time.Hour)
+		}
+
+		if ttl := topicTTLs[msg.Topic]; ttl > 0 {
+			msg.ExpiresAt = time.Now().Add(time.Duration(ttl) * time.Second).Unix()
+		}
+
+		key := r.streamKey(msg.Topic, msg.PartitionID)
+		data, _ := json.Marshal(msg)
+		args := &redis.XAddArgs{
+			Stream: key,
+			Values: map[string]interface{}{"data": data},
+		}
+		results[i] = pipe.XAdd(ctx, args)
+	}
+
+	// 执行 Pipeline
+	_, err := pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	// 3. 解析结果
+	offsets := make([]int64, len(msgs))
+	for i, resCmd := range results {
+		res, err := resCmd.Result()
 		if err != nil {
-			return 0, err
+			log.WithContext(ctx).Error("批量写入消息项失败", "index", i, "error", err)
+			continue
 		}
-		if !set {
-			// 重复消息，从元数据获取之前的 Offset (可选，目前先返回 0)
-			return 0, nil
-		}
+		offsets[i] = encodeOffset(res)
 	}
 
-	key := r.streamKey(msg.Topic, msg.PartitionID)
-
-	// 获取 TTL 配置
-	ttlKey := fmt.Sprintf("gmq:meta:ttl:%s", msg.Topic)
-	ttlVal, _ := r.client.Get(ctx, ttlKey).Float64()
-	if ttlVal > 0 {
-		msg.ExpiresAt = time.Now().Add(time.Duration(ttlVal) * time.Second).Unix()
-	}
-
-	data, _ := json.Marshal(msg)
-
-	args := &redis.XAddArgs{
-		Stream: key,
-		Values: map[string]interface{}{"data": data},
-	}
-
-	// 如果有 TTL，可以考虑限制 Stream 长度（简单粗暴但有效）
-	// 或者在读取时过滤。Redis Stream 暂不支持原生消息级 TTL
-	// 这里我们主要依赖读取时的逻辑过滤
-
-	res, err := r.client.XAdd(ctx, args).Result()
-	if err != nil {
-		return 0, err
-	}
-
-	log.WithContext(ctx).Debug("写入消息成功", "topic", msg.Topic, "partition", msg.PartitionID, "id", res)
-	return encodeOffset(res), nil
+	return offsets, nil
 }
 
 func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error) {

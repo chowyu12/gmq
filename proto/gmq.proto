@@ -68,41 +68,51 @@ enum QoS {
   QOS_EXACTLY_ONCE = 2;
 }
 
-// 发布消息请求
+// 发布消息请求 (支持批量)
 message PublishRequest {
   // 请求ID
   string request_id = 1;
-  // Topic 名称
-  string topic = 2;
-  // 分区键（用于确定分区）
-  string partition_key = 3;
-  // 指定分区ID（可选，优先级高于partition_key）
-  int32 partition_id = 4;
-  // 消息体
-  bytes payload = 5;
-  // 消息属性
-  map<string, string> properties = 6;
-  // QoS 级别
-  QoS qos = 7;
-  // 生产端幂等支持
-  string producer_id = 8;
-  int64 sequence_number = 9;
+  // 消息列表
+  repeated PublishItem items = 2;
 }
 
-// 发布消息响应
+message PublishItem {
+  // Topic 名称
+  string topic = 1;
+  // 分区键（用于确定分区）
+  string partition_key = 2;
+  // 指定分区ID（可选，优先级高于partition_key）
+  int32 partition_id = 3;
+  // 消息体
+  bytes payload = 4;
+  // 消息属性
+  map<string, string> properties = 5;
+  // QoS 级别
+  QoS qos = 6;
+  // 生产端幂等支持
+  string producer_id = 7;
+  int64 sequence_number = 8;
+}
+
+// 发布消息响应 (支持批量)
 message PublishResponse {
   // 请求ID
   string request_id = 1;
+  // 结果列表
+  repeated PublishResult results = 2;
+}
+
+message PublishResult {
   // 是否成功
-  bool success = 2;
+  bool success = 1;
   // 消息ID
-  string message_id = 3;
+  string message_id = 2;
   // Topic 名称
-  string topic = 4;
+  string topic = 3;
   // 实际分区ID
-  int32 partition_id = 5;
+  int32 partition_id = 4;
   // 错误信息
-  string error_message = 6;
+  string error_message = 5;
 }
 
 // 订阅请求
@@ -129,7 +139,7 @@ message SubscribeRequest {
 message CreateTopicRequest {
   string topic = 1;
   int32 partitions = 2;
-  int64 ttl_seconds = 3; // 新增：过期时间（秒）
+  int64 ttl_seconds = 3;
 }
 
 message CreateTopicResponse {
@@ -149,8 +159,12 @@ message SubscribeResponse {
   string error_message = 4;
 }
 
-// 消费消息
+// 消费消息 (支持批量推送)
 message ConsumeMessage {
+  repeated MessageItem items = 1;
+}
+
+message MessageItem {
   // 消息ID
   string message_id = 1;
   // Topic 名称
@@ -169,22 +183,23 @@ message ConsumeMessage {
   QoS qos = 8;
 }
 
-// 消息确认请求
+// 消息确认请求 (支持批量确认)
 message AckRequest {
   // 请求ID
   string request_id = 1;
-  // 消息ID
-  string message_id = 2;
-  // Topic 名称
-  string topic = 3;
-  // 分区ID
-  int32 partition_id = 4;
   // 消费组
-  string consumer_group = 5;
+  string consumer_group = 2;
   // 消费者ID
-  string consumer_id = 6;
-  // 偏移量
-  int64 offset = 7;
+  string consumer_id = 3;
+  // 确认项列表
+  repeated AckItem items = 4;
+}
+
+message AckItem {
+  string topic = 1;
+  int32 partition_id = 2;
+  string message_id = 3;
+  int64 offset = 4;
 }
 
 // 消息确认响应

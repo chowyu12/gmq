@@ -17,18 +17,16 @@ import (
 // MessageContext 消息处理上下文
 type MessageContext interface {
 	context.Context
-	Message() *pb.ConsumeMessage
-	Ack() error
+	Messages() []*pb.MessageItem
 }
 
 type messageContext struct {
 	context.Context
-	msg      *pb.ConsumeMessage
+	msgs     []*pb.MessageItem
 	consumer *Consumer
 }
 
-func (m *messageContext) Message() *pb.ConsumeMessage { return m.msg }
-func (m *messageContext) Ack() error                  { return m.consumer.Ack(m.Context, m.msg) }
+func (m *messageContext) Messages() []*pb.MessageItem { return m.msgs }
 
 // MessageHandler 消息处理函数
 type MessageHandler func(ctx MessageContext) error
@@ -284,22 +282,24 @@ func NewProducer(cfg *ProducerConfig) (*Producer, error) {
 	return p, nil
 }
 
-func (p *Producer) Publish(ctx context.Context, topic string, payload []byte, opts ...PublishOption) (*pb.PublishResponse, error) {
+func (p *Producer) Publish(ctx context.Context, items []*pb.PublishItem) (*pb.PublishResponse, error) {
+	if len(items) == 0 {
+		return nil, fmt.Errorf("发送项不能为空")
+	}
+
 	p.seqMu.Lock()
-	p.sequenceNumber++
-	seq := p.sequenceNumber
+	for _, item := range items {
+		if item.ProducerId == "" {
+			item.ProducerId = p.producerID
+		}
+		p.sequenceNumber++
+		item.SequenceNumber = p.sequenceNumber
+	}
 	p.seqMu.Unlock()
 
 	req := &pb.PublishRequest{
-		RequestId:      uuid.New().String(),
-		Topic:          topic,
-		Payload:        payload,
-		Qos:            pb.QoS_QOS_AT_MOST_ONCE,
-		ProducerId:     p.producerID,
-		SequenceNumber: seq,
-	}
-	for _, opt := range opts {
-		opt(req)
+		RequestId: uuid.New().String(),
+		Items:     items,
 	}
 
 	respChan := make(chan *pb.StreamMessage, 1)
@@ -456,15 +456,14 @@ func (c *Consumer) startWorker() {
 			if !ok {
 				return
 			}
-			if c.messageHandler != nil {
-				// 创建消息上下文
+			if c.messageHandler != nil && len(msg.Items) > 0 {
+				// 创建消息上下文，包含整批消息
 				mctx := &messageContext{
 					Context:  c.ctx,
-					msg:      msg,
+					msgs:     msg.Items,
 					consumer: c,
 				}
-				// 执行用户业务逻辑
-				// 生产环境下建议由用户在 Handler 内部通过 ctx.Ack() 显式确认
+				// 执行用户业务逻辑（批量处理）
 				_ = c.messageHandler(mctx)
 			}
 		}
@@ -527,15 +526,26 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, opts ...Subscrib
 	}
 }
 
-func (c *Consumer) Ack(ctx context.Context, msg *pb.ConsumeMessage) error {
+func (c *Consumer) Ack(ctx context.Context, items []*pb.MessageItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	ackItems := make([]*pb.AckItem, len(items))
+	for i, item := range items {
+		ackItems[i] = &pb.AckItem{
+			Topic:       item.Topic,
+			PartitionId: item.PartitionId,
+			MessageId:   item.MessageId,
+			Offset:      item.Offset,
+		}
+	}
+
 	req := &pb.AckRequest{
 		RequestId:     uuid.New().String(),
-		MessageId:     msg.MessageId,
-		Topic:         msg.Topic,
-		PartitionId:   msg.PartitionId,
 		ConsumerGroup: c.consumerGroup,
 		ConsumerId:    c.consumerID,
-		Offset:        msg.Offset,
+		Items:         ackItems,
 	}
 
 	c.mu.Lock()
@@ -551,22 +561,22 @@ func (c *Consumer) Ack(ctx context.Context, msg *pb.ConsumeMessage) error {
 }
 
 // PublishOption 发布选项
-type PublishOption func(*pb.PublishRequest)
+type PublishOption func(*pb.PublishItem)
 
 func WithPartitionKey(key string) PublishOption {
-	return func(req *pb.PublishRequest) { req.PartitionKey = key }
+	return func(req *pb.PublishItem) { req.PartitionKey = key }
 }
 
 func WithPartitionID(id int32) PublishOption {
-	return func(req *pb.PublishRequest) { req.PartitionId = id }
+	return func(req *pb.PublishItem) { req.PartitionId = id }
 }
 
 func WithProperties(props map[string]string) PublishOption {
-	return func(req *pb.PublishRequest) { req.Properties = props }
+	return func(req *pb.PublishItem) { req.Properties = props }
 }
 
 func WithQoS(qos pb.QoS) PublishOption {
-	return func(req *pb.PublishRequest) { req.Qos = qos }
+	return func(req *pb.PublishItem) { req.Qos = qos }
 }
 
 // SubscribeOption 订阅选项

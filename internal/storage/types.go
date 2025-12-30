@@ -42,7 +42,7 @@ type ConsumerState struct {
 // Storage 统一存储接口
 type Storage interface {
 	// --- 消息操作 ---
-	WriteMessage(ctx context.Context, msg *Message) (int64, error)
+	WriteMessages(ctx context.Context, msgs []*Message) ([]int64, error)
 	ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error)
 	CreatePartition(ctx context.Context, topic string, partitionID int32) error
 	GetPartition(ctx context.Context, topic string, partitionID int32) (*Partition, error)
@@ -61,6 +61,6 @@ type Storage interface {
 	DeleteConsumer(ctx context.Context, id, group, topic string) error
 	UpdateAssignment(ctx context.Context, group, topic string, assignment map[int32]string) error
 	GetAssignment(ctx context.Context, group, topic string) (map[int32]string, error)
-	
+
 	Close() error
 }

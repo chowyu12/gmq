@@ -139,27 +139,27 @@ func (x *Message) GetSequenceNumber() int64 {
 	return 0
 }
 
-type WriteMessageRequest struct {
+type WriteMessagesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       *Message               `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WriteMessageRequest) Reset() {
-	*x = WriteMessageRequest{}
+func (x *WriteMessagesRequest) Reset() {
+	*x = WriteMessagesRequest{}
 	mi := &file_proto_storage_storage_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WriteMessageRequest) String() string {
+func (x *WriteMessagesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WriteMessageRequest) ProtoMessage() {}
+func (*WriteMessagesRequest) ProtoMessage() {}
 
-func (x *WriteMessageRequest) ProtoReflect() protoreflect.Message {
+func (x *WriteMessagesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_storage_storage_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -171,41 +171,41 @@ func (x *WriteMessageRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WriteMessageRequest.ProtoReflect.Descriptor instead.
-func (*WriteMessageRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use WriteMessagesRequest.ProtoReflect.Descriptor instead.
+func (*WriteMessagesRequest) Descriptor() ([]byte, []int) {
 	return file_proto_storage_storage_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *WriteMessageRequest) GetMessage() *Message {
+func (x *WriteMessagesRequest) GetMessages() []*Message {
 	if x != nil {
-		return x.Message
+		return x.Messages
 	}
 	return nil
 }
 
-type WriteMessageResponse struct {
+type WriteMessagesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	Offset        int64                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	Offsets       []int64                `protobuf:"varint,3,rep,packed,name=offsets,proto3" json:"offsets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WriteMessageResponse) Reset() {
-	*x = WriteMessageResponse{}
+func (x *WriteMessagesResponse) Reset() {
+	*x = WriteMessagesResponse{}
 	mi := &file_proto_storage_storage_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WriteMessageResponse) String() string {
+func (x *WriteMessagesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WriteMessageResponse) ProtoMessage() {}
+func (*WriteMessagesResponse) ProtoMessage() {}
 
-func (x *WriteMessageResponse) ProtoReflect() protoreflect.Message {
+func (x *WriteMessagesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_storage_storage_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -217,30 +217,30 @@ func (x *WriteMessageResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WriteMessageResponse.ProtoReflect.Descriptor instead.
-func (*WriteMessageResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use WriteMessagesResponse.ProtoReflect.Descriptor instead.
+func (*WriteMessagesResponse) Descriptor() ([]byte, []int) {
 	return file_proto_storage_storage_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *WriteMessageResponse) GetSuccess() bool {
+func (x *WriteMessagesResponse) GetSuccess() bool {
 	if x != nil {
 		return x.Success
 	}
 	return false
 }
 
-func (x *WriteMessageResponse) GetErrorMessage() string {
+func (x *WriteMessagesResponse) GetErrorMessage() string {
 	if x != nil {
 		return x.ErrorMessage
 	}
 	return ""
 }
 
-func (x *WriteMessageResponse) GetOffset() int64 {
+func (x *WriteMessagesResponse) GetOffsets() []int64 {
 	if x != nil {
-		return x.Offset
+		return x.Offsets
 	}
-	return 0
+	return nil
 }
 
 type ReadMessagesRequest struct {
@@ -1745,13 +1745,13 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	" \x01(\x03R\x0esequenceNumber\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
-	"\x13WriteMessageRequest\x12*\n" +
-	"\amessage\x18\x01 \x01(\v2\x10.storage.MessageR\amessage\"m\n" +
-	"\x14WriteMessageResponse\x12\x18\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"D\n" +
+	"\x14WriteMessagesRequest\x12,\n" +
+	"\bmessages\x18\x01 \x03(\v2\x10.storage.MessageR\bmessages\"p\n" +
+	"\x15WriteMessagesResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x03R\x06offset\"|\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12\x18\n" +
+	"\aoffsets\x18\x03 \x03(\x03R\aoffsets\"|\n" +
 	"\x13ReadMessagesRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12!\n" +
 	"\fpartition_id\x18\x02 \x01(\x05R\vpartitionId\x12\x16\n" +
@@ -1857,9 +1857,9 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x1aF\n" +
 	"\x18PartitionAssignmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xa0\b\n" +
-	"\x0eStorageService\x12K\n" +
-	"\fWriteMessage\x12\x1c.storage.WriteMessageRequest\x1a\x1d.storage.WriteMessageResponse\x12K\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xa3\b\n" +
+	"\x0eStorageService\x12N\n" +
+	"\rWriteMessages\x12\x1d.storage.WriteMessagesRequest\x1a\x1e.storage.WriteMessagesResponse\x12K\n" +
 	"\fReadMessages\x12\x1c.storage.ReadMessagesRequest\x1a\x1d.storage.ReadMessagesResponse\x12T\n" +
 	"\x0fCreatePartition\x12\x1f.storage.CreatePartitionRequest\x1a .storage.CreatePartitionResponse\x12K\n" +
 	"\fGetPartition\x12\x1c.storage.GetPartitionRequest\x1a\x1d.storage.GetPartitionResponse\x12K\n" +
@@ -1888,8 +1888,8 @@ func file_proto_storage_storage_proto_rawDescGZIP() []byte {
 var file_proto_storage_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_proto_storage_storage_proto_goTypes = []any{
 	(*Message)(nil),                       // 0: storage.Message
-	(*WriteMessageRequest)(nil),           // 1: storage.WriteMessageRequest
-	(*WriteMessageResponse)(nil),          // 2: storage.WriteMessageResponse
+	(*WriteMessagesRequest)(nil),          // 1: storage.WriteMessagesRequest
+	(*WriteMessagesResponse)(nil),         // 2: storage.WriteMessagesResponse
 	(*ReadMessagesRequest)(nil),           // 3: storage.ReadMessagesRequest
 	(*ReadMessagesResponse)(nil),          // 4: storage.ReadMessagesResponse
 	(*CreatePartitionRequest)(nil),        // 5: storage.CreatePartitionRequest
@@ -1922,7 +1922,7 @@ var file_proto_storage_storage_proto_goTypes = []any{
 }
 var file_proto_storage_storage_proto_depIdxs = []int32{
 	29, // 0: storage.Message.properties:type_name -> storage.Message.PropertiesEntry
-	0,  // 1: storage.WriteMessageRequest.message:type_name -> storage.Message
+	0,  // 1: storage.WriteMessagesRequest.messages:type_name -> storage.Message
 	0,  // 2: storage.ReadMessagesResponse.messages:type_name -> storage.Message
 	8,  // 3: storage.GetPartitionResponse.partition:type_name -> storage.PartitionInfo
 	8,  // 4: storage.ListPartitionsResponse.partitions:type_name -> storage.PartitionInfo
@@ -1930,7 +1930,7 @@ var file_proto_storage_storage_proto_depIdxs = []int32{
 	18, // 6: storage.GetConsumersResponse.consumers:type_name -> storage.ConsumerState
 	30, // 7: storage.UpdateGroupAssignmentRequest.partition_assignment:type_name -> storage.UpdateGroupAssignmentRequest.PartitionAssignmentEntry
 	31, // 8: storage.GetGroupAssignmentResponse.partition_assignment:type_name -> storage.GetGroupAssignmentResponse.PartitionAssignmentEntry
-	1,  // 9: storage.StorageService.WriteMessage:input_type -> storage.WriteMessageRequest
+	1,  // 9: storage.StorageService.WriteMessages:input_type -> storage.WriteMessagesRequest
 	3,  // 10: storage.StorageService.ReadMessages:input_type -> storage.ReadMessagesRequest
 	5,  // 11: storage.StorageService.CreatePartition:input_type -> storage.CreatePartitionRequest
 	7,  // 12: storage.StorageService.GetPartition:input_type -> storage.GetPartitionRequest
@@ -1943,7 +1943,7 @@ var file_proto_storage_storage_proto_depIdxs = []int32{
 	23, // 19: storage.StorageService.DeleteConsumer:input_type -> storage.DeleteConsumerRequest
 	25, // 20: storage.StorageService.UpdateGroupAssignment:input_type -> storage.UpdateGroupAssignmentRequest
 	27, // 21: storage.StorageService.GetGroupAssignment:input_type -> storage.GetGroupAssignmentRequest
-	2,  // 22: storage.StorageService.WriteMessage:output_type -> storage.WriteMessageResponse
+	2,  // 22: storage.StorageService.WriteMessages:output_type -> storage.WriteMessagesResponse
 	4,  // 23: storage.StorageService.ReadMessages:output_type -> storage.ReadMessagesResponse
 	6,  // 24: storage.StorageService.CreatePartition:output_type -> storage.CreatePartitionResponse
 	9,  // 25: storage.StorageService.GetPartition:output_type -> storage.GetPartitionResponse

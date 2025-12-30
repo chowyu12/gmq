@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StorageService_WriteMessage_FullMethodName          = "/storage.StorageService/WriteMessage"
+	StorageService_WriteMessages_FullMethodName         = "/storage.StorageService/WriteMessages"
 	StorageService_ReadMessages_FullMethodName          = "/storage.StorageService/ReadMessages"
 	StorageService_CreatePartition_FullMethodName       = "/storage.StorageService/CreatePartition"
 	StorageService_GetPartition_FullMethodName          = "/storage.StorageService/GetPartition"
@@ -41,7 +41,7 @@ const (
 // Storage Service - 存储服务接口
 type StorageServiceClient interface {
 	// --- 消息接口 ---
-	WriteMessage(ctx context.Context, in *WriteMessageRequest, opts ...grpc.CallOption) (*WriteMessageResponse, error)
+	WriteMessages(ctx context.Context, in *WriteMessagesRequest, opts ...grpc.CallOption) (*WriteMessagesResponse, error)
 	ReadMessages(ctx context.Context, in *ReadMessagesRequest, opts ...grpc.CallOption) (*ReadMessagesResponse, error)
 	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
 	GetPartition(ctx context.Context, in *GetPartitionRequest, opts ...grpc.CallOption) (*GetPartitionResponse, error)
@@ -69,10 +69,10 @@ func NewStorageServiceClient(cc grpc.ClientConnInterface) StorageServiceClient {
 	return &storageServiceClient{cc}
 }
 
-func (c *storageServiceClient) WriteMessage(ctx context.Context, in *WriteMessageRequest, opts ...grpc.CallOption) (*WriteMessageResponse, error) {
+func (c *storageServiceClient) WriteMessages(ctx context.Context, in *WriteMessagesRequest, opts ...grpc.CallOption) (*WriteMessagesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(WriteMessageResponse)
-	err := c.cc.Invoke(ctx, StorageService_WriteMessage_FullMethodName, in, out, cOpts...)
+	out := new(WriteMessagesResponse)
+	err := c.cc.Invoke(ctx, StorageService_WriteMessages_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (c *storageServiceClient) GetGroupAssignment(ctx context.Context, in *GetGr
 // Storage Service - 存储服务接口
 type StorageServiceServer interface {
 	// --- 消息接口 ---
-	WriteMessage(context.Context, *WriteMessageRequest) (*WriteMessageResponse, error)
+	WriteMessages(context.Context, *WriteMessagesRequest) (*WriteMessagesResponse, error)
 	ReadMessages(context.Context, *ReadMessagesRequest) (*ReadMessagesResponse, error)
 	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
 	GetPartition(context.Context, *GetPartitionRequest) (*GetPartitionResponse, error)
@@ -234,8 +234,8 @@ type StorageServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedStorageServiceServer struct{}
 
-func (UnimplementedStorageServiceServer) WriteMessage(context.Context, *WriteMessageRequest) (*WriteMessageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method WriteMessage not implemented")
+func (UnimplementedStorageServiceServer) WriteMessages(context.Context, *WriteMessagesRequest) (*WriteMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WriteMessages not implemented")
 }
 func (UnimplementedStorageServiceServer) ReadMessages(context.Context, *ReadMessagesRequest) (*ReadMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadMessages not implemented")
@@ -294,20 +294,20 @@ func RegisterStorageServiceServer(s grpc.ServiceRegistrar, srv StorageServiceSer
 	s.RegisterService(&StorageService_ServiceDesc, srv)
 }
 
-func _StorageService_WriteMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WriteMessageRequest)
+func _StorageService_WriteMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteMessagesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StorageServiceServer).WriteMessage(ctx, in)
+		return srv.(StorageServiceServer).WriteMessages(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: StorageService_WriteMessage_FullMethodName,
+		FullMethod: StorageService_WriteMessages_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServiceServer).WriteMessage(ctx, req.(*WriteMessageRequest))
+		return srv.(StorageServiceServer).WriteMessages(ctx, req.(*WriteMessagesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -536,8 +536,8 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*StorageServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "WriteMessage",
-			Handler:    _StorageService_WriteMessage_Handler,
+			MethodName: "WriteMessages",
+			Handler:    _StorageService_WriteMessages_Handler,
 		},
 		{
 			MethodName: "ReadMessages",

@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	log.Init("info")
+	log.Init("debug")
 	log.Info("=== GMQ 消费组示例 ===")
 	log.Info("启动多个消费者组成消费组，演示负载均衡...")
 
@@ -47,21 +47,37 @@ func startConsumer(id int, consumerGroup, topic string) {
 	var messageCount int
 	var mu sync.Mutex
 
-	consumer, err := client.NewConsumer(&client.ConsumerConfig{
+	var consumer *client.Consumer
+	var err error
+
+	consumer, err = client.NewConsumer(&client.ConsumerConfig{
 		ServerAddr:    "localhost:50051",
 		ConsumerGroup: consumerGroup,
 		ConsumerID:    consumerID,
 		MessageHandler: func(ctx client.MessageContext) error {
-			msg := ctx.Message()
+			msgs := ctx.Messages()
 			mu.Lock()
-			messageCount++
-			count := messageCount
+			messageCount += len(msgs)
+			currentTotal := messageCount
 			mu.Unlock()
 
-			log.Info("收到消息", "consumer", consumerID, "count", count, "msgID", msg.MessageId, "partition", msg.PartitionId, "payload", string(msg.Payload))
+			log.Info(">>> 收到消息批次",
+				"consumer", consumerID,
+				"batchSize", len(msgs),
+				"totalReceived", currentTotal)
 
-			// 显式确认消息
-			return ctx.Ack()
+			// 模拟批量业务处理
+			for _, msg := range msgs {
+				log.Debug("处理消息", "msgID", msg.MessageId, "payload", string(msg.Payload))
+			}
+
+			// 显式批量确认
+			if err := consumer.Ack(context.Background(), msgs); err != nil {
+				log.Error("批量确认失败", "error", err)
+				return err
+			}
+			log.Info("<<< 批次确认成功", "consumer", consumerID, "count", len(msgs))
+			return nil
 		},
 		ErrorHandler: func(err error) {
 			log.Error("消费者错误", "consumer", consumerID, "error", err)

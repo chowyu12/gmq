@@ -36,27 +36,29 @@ func NewStorageServer(store storage.Storage) *StorageServer {
 
 // --- 消息接口实现 ---
 
-func (s *StorageServer) WriteMessage(ctx context.Context, req *pb.WriteMessageRequest) (*pb.WriteMessageResponse, error) {
-	msg := req.Message
-	internalMsg := &storage.Message{
-		ID:             msg.Id,
-		Topic:          msg.Topic,
-		PartitionID:    msg.PartitionId,
-		Payload:        msg.Payload,
-		Properties:     msg.Properties,
-		Timestamp:      msg.Timestamp,
-		QoS:            msg.Qos,
-		ProducerID:     msg.ProducerId,
-		SequenceNumber: msg.SequenceNumber,
+func (s *StorageServer) WriteMessages(ctx context.Context, req *pb.WriteMessagesRequest) (*pb.WriteMessagesResponse, error) {
+	internalMsgs := make([]*storage.Message, len(req.Messages))
+	for i, msg := range req.Messages {
+		internalMsgs[i] = &storage.Message{
+			ID:             msg.Id,
+			Topic:          msg.Topic,
+			PartitionID:    msg.PartitionId,
+			Payload:        msg.Payload,
+			Properties:     msg.Properties,
+			Timestamp:      msg.Timestamp,
+			QoS:            msg.Qos,
+			ProducerID:     msg.ProducerId,
+			SequenceNumber: msg.SequenceNumber,
+		}
 	}
 
-	offset, err := s.store.WriteMessage(ctx, internalMsg)
+	offsets, err := s.store.WriteMessages(ctx, internalMsgs)
 	if err != nil {
-		log.WithContext(ctx).Error("写入消息失败", "topic", msg.Topic, "error", err)
-		return &pb.WriteMessageResponse{Success: false, ErrorMessage: err.Error()}, nil
+		log.WithContext(ctx).Error("批量写入消息失败", "error", err)
+		return &pb.WriteMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
 
-	return &pb.WriteMessageResponse{Success: true, Offset: offset}, nil
+	return &pb.WriteMessagesResponse{Success: true, Offsets: offsets}, nil
 }
 
 func (s *StorageServer) ReadMessages(ctx context.Context, req *pb.ReadMessagesRequest) (*pb.ReadMessagesResponse, error) {
