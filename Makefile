@@ -27,6 +27,7 @@ build: proto
 	@echo "构建示例..."
 	@go build -o bin/producer examples/producer/main.go
 	@go build -o bin/consumer_group examples/consumer_group/main.go
+	@go build -o bin/benchmark examples/benchmark/main.go
 	@echo "✓ 构建完成，二进制文件位于 bin/ 目录"
 
 # Docker 编排
@@ -57,3 +58,10 @@ example-prod:
 
 example-group:
 	@go run examples/consumer_group/main.go
+
+# 性能压测
+bench-prod: build
+	@bin/benchmark -mode prod -c 50 -n 200000 -b 100 -s 512
+
+bench-cons: build
+	@bin/benchmark -mode cons -c 10

@@ -55,7 +55,7 @@ services:
       - -storage
       - storage:50052
       - -partitions
-      - "4"
+      - "10"
     ports:
       - "50051:50051"
     networks:

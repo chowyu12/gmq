@@ -18,6 +18,7 @@ import (
 type MessageContext interface {
 	context.Context
 	Messages() []*pb.MessageItem
+	Ack() error // 确认当前批次的所有消息
 }
 
 type messageContext struct {
@@ -27,9 +28,7 @@ type messageContext struct {
 }
 
 func (m *messageContext) Messages() []*pb.MessageItem { return m.msgs }
-
-// MessageHandler 消息处理函数
-type MessageHandler func(ctx MessageContext) error
+func (m *messageContext) Ack() error               { return m.consumer.Ack(m.Context, m.msgs) }
 
 // ErrorHandler 错误处理函数
 type ErrorHandler func(err error)
@@ -353,14 +352,9 @@ func (p *Producer) CreateTopic(ctx context.Context, topic string, partitions int
 // Consumer 消费者客户端
 type Consumer struct {
 	*baseClient
-	messageHandler MessageHandler
-	pullIntervalMs int32
-	msgChan        chan *pb.ConsumeMessage // 内部消息队列
-	workerWg       sync.WaitGroup
-
-	// 自动重连时恢复订阅
-	subscribedTopics map[string][]SubscribeOption
-	subMu            sync.RWMutex
+	topic            string // 订阅的主题
+	pullIntervalMs   int32
+	msgChan          chan *pb.ConsumeMessage // 内部消息队列
 }
 
 type ConsumerConfig struct {
@@ -368,9 +362,9 @@ type ConsumerConfig struct {
 	ConsumerGroup  string // 必填
 	ConsumerID     string
 	ClientID       string
+	Topic          string // 必填
 	PullIntervalMs int32
 	PrefetchCount  int // 预取消息数量，默认 100
-	MessageHandler MessageHandler
 	ErrorHandler   ErrorHandler
 }
 
@@ -402,34 +396,32 @@ func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	}
 
 	c := &Consumer{
-		baseClient:       bc,
-		messageHandler:   cfg.MessageHandler,
-		pullIntervalMs:   cfg.PullIntervalMs,
-		msgChan:          make(chan *pb.ConsumeMessage, cfg.PrefetchCount),
-		subscribedTopics: make(map[string][]SubscribeOption),
+		baseClient:     bc,
+		topic:          cfg.Topic,
+		pullIntervalMs: cfg.PullIntervalMs,
+		msgChan:        make(chan *pb.ConsumeMessage, cfg.PrefetchCount),
 	}
 
 	// 启动接收循环 (将消息放入 msgChan)，并注册重连回调
 	go c.receiveLoop(c.enqueueMessage, c.onReconnect)
-	// 启动消息处理 Worker
-	go c.startWorker()
 	// 启动心跳
 	go c.heartbeatLoop()
+
+	// 初始连接后自动发送订阅请求
+	if err := c.subscribe(context.Background()); err != nil {
+		bc.Close()
+		return nil, fmt.Errorf("初始订阅失败: %w", err)
+	}
 
 	return c, nil
 }
 
 func (c *Consumer) onReconnect() {
-	log.Info("正在恢复订阅...")
-	c.subMu.RLock()
-	defer c.subMu.RUnlock()
-
-	for topic, opts := range c.subscribedTopics {
-		if err := c.Subscribe(context.Background(), topic, opts...); err != nil {
-			log.Error("恢复订阅失败", "topic", topic, "error", err)
-		} else {
-			log.Info("订阅已恢复", "topic", topic)
-		}
+	log.Info("正在恢复订阅...", "topic", c.topic)
+	if err := c.subscribe(context.Background()); err != nil {
+		log.Error("恢复订阅失败", "topic", c.topic, "error", err)
+	} else {
+		log.Info("订阅已恢复", "topic", c.topic)
 	}
 }
 
@@ -443,50 +435,33 @@ func (c *Consumer) enqueueMessage(msg *pb.ConsumeMessage) error {
 	}
 }
 
-// startWorker 负责从队列中取出消息并调用用户的处理逻辑
-func (c *Consumer) startWorker() {
-	c.workerWg.Add(1)
-	defer c.workerWg.Done()
-
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case msg, ok := <-c.msgChan:
-			if !ok {
-				return
-			}
-			if c.messageHandler != nil && len(msg.Items) > 0 {
-				// 创建消息上下文，包含整批消息
-				mctx := &messageContext{
-					Context:  c.ctx,
-					msgs:     msg.Items,
-					consumer: c,
-				}
-				// 执行用户业务逻辑（批量处理）
-				_ = c.messageHandler(mctx)
-			}
+// Receive 阻塞直到接收到下一批次消息
+func (c *Consumer) Receive(ctx context.Context) (MessageContext, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-c.ctx.Done():
+		return nil, c.ctx.Err()
+	case msg, ok := <-c.msgChan:
+		if !ok {
+			return nil, io.EOF
 		}
+		return &messageContext{
+			Context:  c.ctx,
+			msgs:     msg.Items,
+			consumer: c,
+		}, nil
 	}
 }
 
-func (c *Consumer) Subscribe(ctx context.Context, topic string, opts ...SubscribeOption) error {
-	// 记录订阅信息以便重连
-	c.subMu.Lock()
-	c.subscribedTopics[topic] = opts
-	c.subMu.Unlock()
-
+func (c *Consumer) subscribe(ctx context.Context) error {
 	req := &pb.SubscribeRequest{
 		RequestId:      xid.New().String(),
-		Topic:          topic,
+		Topic:          c.topic,
 		ConsumerGroup:  c.consumerGroup,
 		ConsumerId:     c.consumerID,
-		Qos:            pb.QoS_QOS_AT_MOST_ONCE,
 		PullIntervalMs: c.pullIntervalMs,
 		ClientId:       c.clientID,
-	}
-	for _, opt := range opts {
-		opt(req)
 	}
 
 	respChan := make(chan *pb.StreamMessage, 1)
@@ -577,15 +552,4 @@ func WithProperties(props map[string]string) PublishOption {
 
 func WithQoS(qos pb.QoS) PublishOption {
 	return func(req *pb.PublishItem) { req.Qos = qos }
-}
-
-// SubscribeOption 订阅选项
-type SubscribeOption func(*pb.SubscribeRequest)
-
-func WithPartitions(partitions []int32) SubscribeOption {
-	return func(req *pb.SubscribeRequest) { req.Partitions = partitions }
-}
-
-func WithSubscribeQoS(qos pb.QoS) SubscribeOption {
-	return func(req *pb.SubscribeRequest) { req.Qos = qos }
 }

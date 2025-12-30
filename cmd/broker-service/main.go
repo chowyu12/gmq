@@ -140,7 +140,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 		pullInterval     = 100 * time.Millisecond
 	)
 
-	messageChan := make(chan *pb.ConsumeMessage, 100)
+	messageChan := make(chan *pb.ConsumeMessage, 1000)
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 
@@ -209,11 +209,16 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 							continue
 						}
 
+						// 如果当前分区仍有未处理完的消息在 Channel 中，跳过本次拉取，防止撑爆内存
+						if len(messageChan) > 800 {
+							break
+						}
+
 						resp, err := s.storageClient.ReadMessages(ctx, &storagepb.ReadMessagesRequest{
 							Topic:       topic,
 							PartitionId: partID,
 							Offset:      offsetResp.Offset,
-							Limit:       20, // 批量拉取
+							Limit:       1000,
 						})
 						if err != nil || !resp.Success || len(resp.Messages) == 0 {
 							continue
@@ -237,10 +242,10 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 
 						select {
 						case messageChan <- batch:
-						case <-ctx.Done():
-							return
-						case <-stopChan:
-							return
+						default:
+							// 如果 Channel 满了，说明推送协程忙，本次拉取的数据暂时放弃，等待下次轮询
+							// 这样可以防止拉取协程被阻塞
+							log.WithContext(ctx).Warn("消息缓冲区已满，暂缓推送", "topic", topic, "partID", partID)
 						}
 					}
 				}
@@ -274,7 +279,8 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 			s.handleSubscribe(ctx, stream, req)
 
 		case pb.MessageType_MESSAGE_TYPE_ACK_REQUEST:
-			s.handleAck(ctx, stream, msg.GetAckReq())
+			// 异步处理 Ack，不阻塞上行接收循环
+			go s.handleAck(ctx, stream, msg.GetAckReq())
 
 		case pb.MessageType_MESSAGE_TYPE_HEARTBEAT_REQUEST:
 			s.handleHeartbeat(ctx, stream, msg.GetHeartbeatReq())

@@ -11,7 +11,6 @@ import (
 
 	"github.com/chowyu12/gmq/pkg/client"
 	"github.com/chowyu12/gmq/pkg/log"
-	pb "github.com/chowyu12/gmq/proto"
 )
 
 func main() {
@@ -54,54 +53,47 @@ func startConsumer(id int, consumerGroup, topic string) {
 		ServerAddr:    "localhost:50051",
 		ConsumerGroup: consumerGroup,
 		ConsumerID:    consumerID,
-		MessageHandler: func(ctx client.MessageContext) error {
-			msgs := ctx.Messages()
-			mu.Lock()
-			messageCount += len(msgs)
-			currentTotal := messageCount
-			mu.Unlock()
-
-			log.Info(">>> 收到消息批次",
-				"consumer", consumerID,
-				"batchSize", len(msgs),
-				"totalReceived", currentTotal)
-
-			// 模拟批量业务处理
-			for _, msg := range msgs {
-				log.Debug("处理消息", "msgID", msg.MessageId, "payload", string(msg.Payload))
-			}
-
-			// 显式批量确认
-			if err := consumer.Ack(context.Background(), msgs); err != nil {
-				log.Error("批量确认失败", "error", err)
-				return err
-			}
-			log.Info("<<< 批次确认成功", "consumer", consumerID, "count", len(msgs))
-			return nil
-		},
+		Topic:         topic,
 		ErrorHandler: func(err error) {
-			log.Error("消费者错误", "consumer", consumerID, "error", err)
+			log.Error("消费者错误", "consumerID", consumerID, "error", err)
 		},
 	})
 	if err != nil {
-		log.Error("创建消费者失败", "consumer", consumerID, "error", err)
+		log.Error("创建消费者失败", "consumerID", consumerID, "error", err)
 		return
 	}
 	defer consumer.Close()
 
-	// 订阅 topic
-	err = consumer.Subscribe(
-		context.Background(),
-		topic,
-		client.WithSubscribeQoS(pb.QoS_QOS_AT_MOST_ONCE),
-	)
-	if err != nil {
-		log.Error("订阅失败", "consumer", consumerID, "error", err)
-		return
+	log.Info("消费者已启动，进入接收循环...", "consumerID", consumerID, "topic", topic)
+
+	for {
+		mctx, err := consumer.Receive(context.Background())
+		if err != nil {
+			log.Error("接收消息失败", "consumerID", consumerID, "error", err)
+			break
+		}
+
+		msgs := mctx.Messages()
+		mu.Lock()
+		messageCount += len(msgs)
+		currentTotal := messageCount
+		mu.Unlock()
+
+		log.Info(">>> 收到消息批次",
+			"consumer", consumerID,
+			"batchSize", len(msgs),
+			"totalReceived", currentTotal)
+
+		// 模拟批量业务处理
+		for _, msg := range msgs {
+			log.Debug("处理消息", "msgID", msg.MessageId, "payload", string(msg.Payload))
+		}
+
+		// 显式批量确认
+		if err := mctx.Ack(); err != nil {
+			log.Error("批量确认失败", "consumerID", consumerID, "error", err)
+		} else {
+			log.Info("<<< 批次确认成功", "consumerID", consumerID, "count", len(msgs))
+		}
 	}
-
-	log.Info("消费者已启动，等待消息...", "consumer", consumerID)
-
-	// 保持运行
-	select {}
 }
