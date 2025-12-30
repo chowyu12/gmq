@@ -43,7 +43,7 @@ func main() {
 
 func startConsumer(id int, consumerGroup, topic string) {
 	consumerID := fmt.Sprintf("consumer-%d", id)
-	
+
 	var messageCount int
 	var mu sync.Mutex
 
@@ -58,8 +58,8 @@ func startConsumer(id int, consumerGroup, topic string) {
 			count := messageCount
 			mu.Unlock()
 
-			log.Info("收到消息", "consumer", consumerID, "count", count, "msgID", msg.MessageId[:8], "partition", msg.PartitionId, "payload", string(msg.Payload))
-			
+			log.Info("收到消息", "consumer", consumerID, "count", count, "msgID", msg.MessageId, "partition", msg.PartitionId, "payload", string(msg.Payload))
+
 			// 显式确认消息
 			return ctx.Ack()
 		},
