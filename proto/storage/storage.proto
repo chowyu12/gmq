@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package storage;
+
+option go_package = "github.com/chowyu12/gmq/proto/storage;storage";
+
+// Storage Service - 存储服务接口
+service StorageService {
+  // --- 消息接口 ---
+  rpc WriteMessage(WriteMessageRequest) returns (WriteMessageResponse);
+  rpc ReadMessages(ReadMessagesRequest) returns (ReadMessagesResponse);
+  rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse);
+  rpc GetPartition(GetPartitionRequest) returns (GetPartitionResponse);
+  rpc UpdateOffset(UpdateOffsetRequest) returns (UpdateOffsetResponse);
+  rpc GetOffset(GetOffsetRequest) returns (GetOffsetResponse);
+  rpc ListPartitions(ListPartitionsRequest) returns (ListPartitionsResponse);
+  rpc SetTTL(SetTTLRequest) returns (SetTTLResponse); // 新增
+
+  // --- 新增：消费者和消费组状态管理 (强一致性存储) ---
+  
+  // 保存/更新消费者信息
+  rpc SaveConsumer(SaveConsumerRequest) returns (SaveConsumerResponse);
+  // 获取消费组下所有消费者
+  rpc GetConsumers(GetConsumersRequest) returns (GetConsumersResponse);
+  // 删除消费者
+  rpc DeleteConsumer(DeleteConsumerRequest) returns (DeleteConsumerResponse);
+  
+  // 更新消费组分配信息
+  rpc UpdateGroupAssignment(UpdateGroupAssignmentRequest) returns (UpdateGroupAssignmentResponse);
+  // 获取消费组分配信息
+  rpc GetGroupAssignment(GetGroupAssignmentRequest) returns (GetGroupAssignmentResponse);
+}
+
+// 消息结构
+message Message {
+  string id = 1;
+  string topic = 2;
+  int32 partition_id = 3;
+  int64 offset = 4;
+  bytes payload = 5;
+  map<string, string> properties = 6;
+  int64 timestamp = 7;
+  int32 qos = 8;
+}
+
+message WriteMessageRequest {
+  Message message = 1;
+}
+
+message WriteMessageResponse {
+  bool success = 1;
+  string error_message = 2;
+  int64 offset = 3;
+}
+
+message ReadMessagesRequest {
+  string topic = 1;
+  int32 partition_id = 2;
+  int64 offset = 3;
+  int32 limit = 4;
+}
+
+message ReadMessagesResponse {
+  repeated Message messages = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message CreatePartitionRequest {
+  string topic = 1;
+  int32 partition_id = 2;
+}
+
+message CreatePartitionResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message GetPartitionRequest {
+  string topic = 1;
+  int32 partition_id = 2;
+}
+
+message PartitionInfo {
+  int32 id = 1;
+  string topic = 2;
+  int64 next_offset = 3;
+  int64 message_count = 4;
+}
+
+message GetPartitionResponse {
+  PartitionInfo partition = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message UpdateOffsetRequest {
+  string consumer_group = 1;
+  string topic = 2;
+  int32 partition_id = 3;
+  int64 offset = 4;
+}
+
+message UpdateOffsetResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message GetOffsetRequest {
+  string consumer_group = 1;
+  string topic = 2;
+  int32 partition_id = 3;
+}
+
+message GetOffsetResponse {
+  int64 offset = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message ListPartitionsRequest {
+  string topic = 1;
+}
+
+message ListPartitionsResponse {
+  repeated PartitionInfo partitions = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message SetTTLRequest {
+  string topic = 1;
+  int64 ttl_seconds = 2;
+}
+
+message SetTTLResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// --- 消费者管理相关消息 ---
+
+message ConsumerState {
+  string consumer_id = 1;
+  string consumer_group = 2;
+  string topic = 3;
+  repeated int32 assigned_partitions = 4;
+  int64 last_heartbeat = 5;
+}
+
+message SaveConsumerRequest {
+  ConsumerState consumer = 1;
+}
+
+message SaveConsumerResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message GetConsumersRequest {
+  string consumer_group = 1;
+  string topic = 2;
+}
+
+message GetConsumersResponse {
+  repeated ConsumerState consumers = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message DeleteConsumerRequest {
+  string consumer_id = 1;
+  string consumer_group = 2;
+  string topic = 3;
+}
+
+message DeleteConsumerResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message UpdateGroupAssignmentRequest {
+  string consumer_group = 1;
+  string topic = 2;
+  map<int32, string> partition_assignment = 3; // partitionID -> consumerID
+}
+
+message UpdateGroupAssignmentResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message GetGroupAssignmentRequest {
+  string consumer_group = 1;
+  string topic = 2;
+}
+
+message GetGroupAssignmentResponse {
+  map<int32, string> partition_assignment = 1;
+  bool success = 2;
+  string error_message = 3;
+}

@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Storage Service - 存储服务
+  storage:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: storage
+    container_name: gmq-storage
+    hostname: storage
+    command: ["/app/gmq-storage-service", "-addr", ":50052", "-data", "/data"]
+    ports:
+      - "50052:50052"
+    volumes:
+      - storage-data:/data
+    networks:
+      - gmq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50052"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Broker Service - 网关 + 分发服务（无状态，可水平扩展）
+  broker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: broker
+    hostname: broker
+    command:
+      - /app/gmq-broker-service
+      - -addr
+      - ":50051"
+      - -storage
+      - storage:50052
+      - -partitions
+      - "4"
+    ports:
+      - "50051:50051"
+    networks:
+      - gmq-network
+    depends_on:
+      storage:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50051"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  storage-data:
+    driver: local
+
+networks:
+  gmq-network:
+    driver: bridge

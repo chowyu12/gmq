@@ -1,0 +1,35 @@
+# 忽略构建产物
+gmq-server
+gmq-storage-service
+gmq-dispatcher-service
+gmq-gateway-service
+
+# 数据目录
+data/
+storage-data/
+
+# 示例二进制
+examples/producer/producer
+examples/consumer/consumer
+examples/consumer_group/consumer_group
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# Docker
+.dockerignore
+
+# 备份文件
+*.backup
+*.bak
+*.tar.gz

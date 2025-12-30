@@ -1,0 +1,19 @@
+# 数据目录
+data/
+
+# 二进制文件
+gmq
+cmd/server/server
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log

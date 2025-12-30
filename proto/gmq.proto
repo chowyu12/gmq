@@ -1,0 +1,216 @@
+syntax = "proto3";
+
+package gmq;
+
+option go_package = "github.com/chowyu12/gmq/proto;gmq";
+
+// GMQ 消息队列服务
+service GMQService {
+  // 双向流：生产和消费消息
+  rpc Stream(stream StreamMessage) returns (stream StreamMessage);
+
+  // 管理接口：手动创建 Topic
+  rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
+}
+
+// 流消息封装
+message StreamMessage {
+  // 消息类型
+  MessageType type = 1;
+  
+  // 具体消息内容（根据type选择对应字段）
+  oneof payload {
+    PublishRequest publish_req = 2;
+    PublishResponse publish_resp = 3;
+    SubscribeRequest subscribe_req = 4;
+    SubscribeResponse subscribe_resp = 5;
+    ConsumeMessage consume_msg = 6;
+    AckRequest ack_req = 7;
+    AckResponse ack_resp = 8;
+    HeartbeatRequest heartbeat_req = 9;
+    HeartbeatResponse heartbeat_resp = 10;
+    ErrorResponse error_resp = 11;
+  }
+}
+
+// 消息类型
+enum MessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+  // 发布消息请求
+  MESSAGE_TYPE_PUBLISH_REQUEST = 1;
+  // 发布消息响应
+  MESSAGE_TYPE_PUBLISH_RESPONSE = 2;
+  // 订阅请求
+  MESSAGE_TYPE_SUBSCRIBE_REQUEST = 3;
+  // 订阅响应
+  MESSAGE_TYPE_SUBSCRIBE_RESPONSE = 4;
+  // 消费消息推送
+  MESSAGE_TYPE_CONSUME_MESSAGE = 5;
+  // 消息确认请求
+  MESSAGE_TYPE_ACK_REQUEST = 6;
+  // 消息确认响应
+  MESSAGE_TYPE_ACK_RESPONSE = 7;
+  // 心跳请求
+  MESSAGE_TYPE_HEARTBEAT_REQUEST = 8;
+  // 心跳响应
+  MESSAGE_TYPE_HEARTBEAT_RESPONSE = 9;
+  // 错误响应
+  MESSAGE_TYPE_ERROR_RESPONSE = 10;
+}
+
+// QoS 级别
+enum QoS {
+  QOS_UNSPECIFIED = 0;
+  // 至多一次
+  QOS_AT_MOST_ONCE = 1;
+  // 至少一次
+  QOS_AT_LEAST_ONCE = 2;
+}
+
+// 发布消息请求
+message PublishRequest {
+  // 请求ID
+  string request_id = 1;
+  // Topic 名称
+  string topic = 2;
+  // 分区键（用于确定分区）
+  string partition_key = 3;
+  // 指定分区ID（可选，优先级高于partition_key）
+  int32 partition_id = 4;
+  // 消息体
+  bytes payload = 5;
+  // 消息属性
+  map<string, string> properties = 6;
+  // QoS 级别
+  QoS qos = 7;
+}
+
+// 发布消息响应
+message PublishResponse {
+  // 请求ID
+  string request_id = 1;
+  // 是否成功
+  bool success = 2;
+  // 消息ID
+  string message_id = 3;
+  // Topic 名称
+  string topic = 4;
+  // 实际分区ID
+  int32 partition_id = 5;
+  // 错误信息
+  string error_message = 6;
+}
+
+// 订阅请求
+message SubscribeRequest {
+  // 请求ID
+  string request_id = 1;
+  // Topic 名称
+  string topic = 2;
+  // 消费组名称
+  string consumer_group = 3;
+  // 消费者ID
+  string consumer_id = 4;
+  // QoS 级别
+  QoS qos = 5;
+  // 订阅的分区列表（为空则订阅所有分区）
+  repeated int32 partitions = 6;
+  // 拉取间隔（毫秒），可选
+  int32 pull_interval_ms = 7;
+  // 客户端标识，可选
+  string client_id = 8;
+}
+
+// 手动创建 Topic 请求
+message CreateTopicRequest {
+  string topic = 1;
+  int32 partitions = 2;
+  int64 ttl_seconds = 3; // 新增：过期时间（秒）
+}
+
+message CreateTopicResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// 订阅响应
+message SubscribeResponse {
+  // 请求ID
+  string request_id = 1;
+  // 是否成功
+  bool success = 2;
+  // 分配的分区列表
+  repeated int32 assigned_partitions = 3;
+  // 错误信息
+  string error_message = 4;
+}
+
+// 消费消息
+message ConsumeMessage {
+  // 消息ID
+  string message_id = 1;
+  // Topic 名称
+  string topic = 2;
+  // 分区ID
+  int32 partition_id = 3;
+  // 偏移量
+  int64 offset = 4;
+  // 消息体
+  bytes payload = 5;
+  // 消息属性
+  map<string, string> properties = 6;
+  // 时间戳
+  int64 timestamp = 7;
+  // QoS 级别
+  QoS qos = 8;
+}
+
+// 消息确认请求
+message AckRequest {
+  // 请求ID
+  string request_id = 1;
+  // 消息ID
+  string message_id = 2;
+  // Topic 名称
+  string topic = 3;
+  // 分区ID
+  int32 partition_id = 4;
+  // 消费组
+  string consumer_group = 5;
+  // 消费者ID
+  string consumer_id = 6;
+  // 偏移量
+  int64 offset = 7;
+}
+
+// 消息确认响应
+message AckResponse {
+  // 请求ID
+  string request_id = 1;
+  // 是否成功
+  bool success = 2;
+  // 错误信息
+  string error_message = 3;
+}
+
+// 心跳请求
+message HeartbeatRequest {
+  // 消费者ID
+  string consumer_id = 1;
+  // 消费组
+  string consumer_group = 2;
+}
+
+// 心跳响应
+message HeartbeatResponse {
+  // 是否成功
+  bool success = 1;
+}
+
+// 错误响应
+message ErrorResponse {
+  // 错误码
+  int32 code = 1;
+  // 错误信息
+  string message = 2;
+}
