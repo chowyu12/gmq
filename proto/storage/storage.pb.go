@@ -7,12 +7,11 @@
 package storage
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -24,17 +23,20 @@ const (
 
 // 消息结构
 type Message struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	PartitionId   int32                  `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
-	Offset        int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
-	Payload       []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
-	Properties    map[string]string      `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Timestamp     int64                  `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Qos           int32                  `protobuf:"varint,8,opt,name=qos,proto3" json:"qos,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Topic       string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
+	PartitionId int32                  `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	Offset      int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	Payload     []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
+	Properties  map[string]string      `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Timestamp   int64                  `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Qos         int32                  `protobuf:"varint,8,opt,name=qos,proto3" json:"qos,omitempty"`
+	// 生产端幂等支持
+	ProducerId     string `protobuf:"bytes,9,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
+	SequenceNumber int64  `protobuf:"varint,10,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Message) Reset() {
@@ -119,6 +121,20 @@ func (x *Message) GetTimestamp() int64 {
 func (x *Message) GetQos() int32 {
 	if x != nil {
 		return x.Qos
+	}
+	return 0
+}
+
+func (x *Message) GetProducerId() string {
+	if x != nil {
+		return x.ProducerId
+	}
+	return ""
+}
+
+func (x *Message) GetSequenceNumber() int64 {
+	if x != nil {
+		return x.SequenceNumber
 	}
 	return 0
 }
@@ -1711,7 +1727,7 @@ var File_proto_storage_storage_proto protoreflect.FileDescriptor
 
 const file_proto_storage_storage_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/storage/storage.proto\x12\astorage\"\xb5\x02\n" +
+	"\x1bproto/storage/storage.proto\x12\astorage\"\xff\x02\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12!\n" +
@@ -1722,7 +1738,11 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"properties\x18\x06 \x03(\v2 .storage.Message.PropertiesEntryR\n" +
 	"properties\x12\x1c\n" +
 	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x12\x10\n" +
-	"\x03qos\x18\b \x01(\x05R\x03qos\x1a=\n" +
+	"\x03qos\x18\b \x01(\x05R\x03qos\x12\x1f\n" +
+	"\vproducer_id\x18\t \x01(\tR\n" +
+	"producerId\x12'\n" +
+	"\x0fsequence_number\x18\n" +
+	" \x01(\x03R\x0esequenceNumber\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
@@ -1851,7 +1871,7 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\fGetConsumers\x12\x1c.storage.GetConsumersRequest\x1a\x1d.storage.GetConsumersResponse\x12Q\n" +
 	"\x0eDeleteConsumer\x12\x1e.storage.DeleteConsumerRequest\x1a\x1f.storage.DeleteConsumerResponse\x12f\n" +
 	"\x15UpdateGroupAssignment\x12%.storage.UpdateGroupAssignmentRequest\x1a&.storage.UpdateGroupAssignmentResponse\x12]\n" +
-	"\x12GetGroupAssignment\x12\".storage.GetGroupAssignmentRequest\x1a#.storage.GetGroupAssignmentResponseB-Z+github.com/chowyu12/gmq/proto/storage;storageb\x06proto3"
+	"\x12GetGroupAssignment\x12\".storage.GetGroupAssignmentRequest\x1a#.storage.GetGroupAssignmentResponseB/Z-github.com/chowyu12/gmq/proto/storage;storageb\x06proto3"
 
 var (
 	file_proto_storage_storage_proto_rawDescOnce sync.Once

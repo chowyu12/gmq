@@ -1,73 +1,43 @@
-# GMQ 架构演进总结：Broker 合并与一致性存储
+# GMQ 架构演进：从单机到分布式高可用
 
-## 🚀 核心变更
+## 🚀 核心变更：全面拥抱 DragonflyDB
 
-根据需求，我们对 GMQ 进行了深度的架构优化和功能增强：
+为了满足生产级的高性能和数据一致性要求，GMQ 完成了从本地文件存储向 **Redis 兼容协议 (DragonflyDB)** 的全面演进。
 
-### 1. 服务合并：Gateway + Dispatcher → Broker
-我们将原有的 `gateway-service`（负责连接）和 `dispatcher-service`（负责逻辑）合并为统一的 **Broker Service**。
+### 1. 存储引擎升级：DragonflyDB
+- **高性能**：DragonflyDB 作为现代化的 Redis 替代者，在多线程性能和内存利用率上具有显著优势。
+- **消息流模型**：利用 Redis Streams 实现消息的高效持久化、顺序保证和消费确认（Ack）。
+- **分布式一致性**：所有 Broker 共享同一个 Dragonfly 集群，确保消费者状态和 Offset 在分布式环境下强一致。
 
-- **优势**：
-  - **降低延迟**：消除了 Gateway 和 Dispatcher 之间的内部 gRPC 调用开销。
-  - **简化拓扑**：减少了一个独立维护的服务组件，降低了运维复杂度。
-  - **无状态扩展**：Broker Service 依然保持无状态设计，可以根据负载轻松水平扩展。
+### 2. 组件架构精简：Broker 统一代理
+- **Gateway + Dispatcher → Broker**：合并了连接管理层和分发逻辑层。
+- **低延迟**：减少了一层内部 gRPC 转发，显著降低了消息推送的端到端延迟。
+- **全无状态**：Broker Service 不再持有任何内存状态，所有的消费者分配信息、分区元数据均下沉至 DragonflyDB。
 
-### 2. 状态持久化：从内存到 Storage Service
-消费者信息、消费组状态和分区分配关系不再存储在 Broker 内存中，而是统一持久化到 **Storage Service**。
+### 3. 增强的 QoS 保证
+- **QoS 1 (At Least Once)**：通过 `XTRIM` 和 `ACK` 机制，确保消息在所有消费组都成功处理前不会被物理删除。
+- **高精度 Offset**：采用 `(timestamp << 20) | sequence` 编码，完美映射 Redis ID，确保消费重启后能够毫秒级精准恢复进度。
+- **生产幂等性**：基于 Redis `SETNX` 的去重窗口，防止生产端重复发送。
 
-- **实现方式**：
-  - 在 `storage.proto` 中增加了状态管理接口。
-  - Broker 在处理 `Subscribe`、`Ack`、`Heartbeat` 等请求时，同步调用 Storage Service 进行状态更新。
-  - 消费者下线时，Broker 会通知 Storage Service 清理状态。
+## 📊 最终架构拓扑
 
-### 3. 存储一致性增强：引入 SQLite
-Storage Service 内部引入了 **SQLite** (基于 `modernc.org/sqlite` 纯 Go 实现) 作为状态存储后端。
-
-- **优势**：
-  - **强一致性**：利用数据库事务保证消费者状态和分配关系的原子性。
-  - **零依赖**：纯 Go 实现，无需 CGO，无需安装 C 编译器即可跨平台构建。
-  - **易于备份**：所有状态存储在 `state.db` 单文件中，极大简化了备份和恢复。
-
-## 📊 新旧架构对比
-
-| 特性 | 旧架构 | 新架构 (当前) |
-|-----|--------|-------------|
-| 组件结构 | Gateway + Dispatcher | **Broker Service** |
-| 消费者状态 | Dispatcher 内存 (重启丢失) | **Storage Service (持久化)** |
-| 存储一致性 | 简单文件写入 | **SQLite 数据库事务** |
-| 网络跳数 | Client → Gateway → Dispatcher | **Client → Broker** |
-| 扩展性 | 需协调多个 Dispatcher 状态 | **Broker 全无状态，按需水平扩展** |
-
-## 🛠️ 快速开始 (新版本)
-
-### 1. 构建所有分布式服务
-```bash
-make build-dist
+```mermaid
+graph TD
+    Client[Client SDK] -- gRPC Stream --> Broker[Broker Service]
+    Broker -- RPC --> Storage[Storage Service]
+    Storage -- Redis Protocol --> Dragonfly[(DragonflyDB)]
 ```
 
-### 2. 启动分布式集群
-```bash
-# 终端 1: 启动持久化存储
-make run-storage
+- **Client SDK**：负责生产/消费逻辑，支持自动重连、心跳和背压处理。
+- **Broker Service**：无状态代理，处理连接接入、分区分配逻辑。
+- **Storage Service**：存储协议转换层，屏蔽底层存储实现细节。
+- **DragonflyDB**：存储核心，承载消息数据、Offset 和元数据。
 
-# 终端 2: 启动合并后的 Broker (连接 + 分发)
-make run-broker
-```
+## 🛠️ 管理与运维
 
-### 3. 使用 Docker Compose 一键启动
-```bash
-make docker
-```
-
-## 📁 存储结构说明
-- `storage-data/`：主目录
-  - `state.db`：消费者、消费组、分区分配状态 (SQLite)
-  - `{topic}/partition_{id}.log`：原始消息数据 (JSON Lines)
-  - `_offsets/`：消费偏移量持久化文件
-
-## 🔮 未来扩展
-- **分布式事务**：如果 Storage Service 也需要多实例横向扩展，可以将 SQLite 替换为 **etcd** 或 **TiKV**。
-- **动态负载均衡**：Broker 可以根据 `state.db` 中的活跃消费者数量，自动进行分区的 Rebalance。
+- **快速启动**：使用 `make up` 即可通过 Docker Compose 一键拉起完整集群。
+- **监控**：DragonflyDB 完美兼容 Redis 监控工具（如 Prometheus Redis Exporter）。
+- **扩展**：Broker Service 可根据 CPU/网络负载随时进行 K8s 水平扩容。
 
 ---
-**架构师笔记**: 本次重构标志着 GMQ 从“演示级”向“生产级”迈出了一大步。通过状态下沉和组件合并，我们在性能和可靠性之间取得了完美的平衡。
+**架构师笔记**: 移除本地文件存储实现（FileStorage）标志着 GMQ 架构的成熟。现在系统不再受限于单机磁盘，而是成为了一个真正的、可水平扩展的现代分布式消息队列。

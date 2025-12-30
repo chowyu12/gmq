@@ -7,15 +7,17 @@ import (
 
 // Message 消息结构（内部使用）
 type Message struct {
-	ID          string            `json:"id"`
-	Topic       string            `json:"topic"`
-	PartitionID int32             `json:"partition_id"`
-	Offset      int64             `json:"offset"`
-	Payload     []byte            `json:"payload"`
-	Properties  map[string]string `json:"properties"`
-	Timestamp   int64             `json:"timestamp"`
-	ExpiresAt   int64             `json:"expires_at,omitempty"`
-	QoS         int32             `json:"qos"`
+	ID             string            `json:"id"`
+	Topic          string            `json:"topic"`
+	PartitionID    int32             `json:"partition_id"`
+	Offset         int64             `json:"offset"`
+	Payload        []byte            `json:"payload"`
+	Properties     map[string]string `json:"properties"`
+	Timestamp      int64             `json:"timestamp"`
+	ExpiresAt      int64             `json:"expires_at,omitempty"`
+	QoS            int32             `json:"qos"`
+	ProducerID     string            `json:"producer_id,omitempty"`
+	SequenceNumber int64             `json:"sequence_number,omitempty"`
 }
 
 // Partition 分区结构

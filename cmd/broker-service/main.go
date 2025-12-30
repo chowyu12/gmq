@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto"
 	storagepb "github.com/chowyu12/gmq/proto/storage"
 	"github.com/google/uuid"
@@ -21,19 +22,18 @@ import (
 )
 
 var (
-	addr              = flag.String("addr", ":50051", "Broker服务监听地址")
-	storageAddr       = flag.String("storage", "localhost:50052", "Storage服务地址")
+	addr              = flag.String("addr", ":50051", "Broker 服务监听地址")
+	storageAddr       = flag.String("storage", "localhost:50052", "Storage 服务地址")
 	defaultPartitions = flag.Int("partitions", 4, "默认分区数")
+	logLevel          = flag.String("log-level", "info", "日志级别: debug, info, warn, error")
 )
 
-// BrokerServer 合并后的服务，集成了 Gateway 和 Dispatcher 功能
+// BrokerServer 统一代理服务，集成连接管理、分发逻辑和负载均衡
 type BrokerServer struct {
 	pb.UnimplementedGMQServiceServer
 	storageClient storagepb.StorageServiceClient
 	partitions    int32
-
-	// 本地缓存，用于快速分发，但状态持久化在 Storage
-	mu sync.RWMutex
+	mu            sync.RWMutex
 }
 
 func NewBrokerServer(client storagepb.StorageServiceClient, partitions int32) *BrokerServer {
@@ -43,9 +43,8 @@ func NewBrokerServer(client storagepb.StorageServiceClient, partitions int32) *B
 	}
 }
 
-// rebalance 重新分配分区的辅助方法
+// rebalance 重新分配分区
 func (s *BrokerServer) rebalance(ctx context.Context, consumerGroup, topic string) error {
-	// 1. 获取所有活跃消费者
 	consumersResp, err := s.storageClient.GetConsumers(ctx, &storagepb.GetConsumersRequest{
 		ConsumerGroup: consumerGroup,
 		Topic:         topic,
@@ -58,7 +57,7 @@ func (s *BrokerServer) rebalance(ctx context.Context, consumerGroup, topic strin
 		return nil
 	}
 
-	// 2. 简单的平均分配算法
+	// 简单的平均分配算法
 	assignment := make(map[int32]string)
 	for i := int32(0); i < s.partitions; i++ {
 		consumerIndex := int(i) % len(consumersResp.Consumers)
@@ -66,12 +65,14 @@ func (s *BrokerServer) rebalance(ctx context.Context, consumerGroup, topic strin
 		assignment[i] = targetConsumerID
 	}
 
-	// 3. 更新到 Storage
 	_, err = s.storageClient.UpdateGroupAssignment(ctx, &storagepb.UpdateGroupAssignmentRequest{
 		ConsumerGroup:       consumerGroup,
 		Topic:               topic,
 		PartitionAssignment: assignment,
 	})
+	if err == nil {
+		log.WithContext(ctx).Info("重平衡完成", "topic", topic, "group", consumerGroup, "assignment", assignment)
+	}
 	return err
 }
 
@@ -79,7 +80,7 @@ func (s *BrokerServer) rebalance(ctx context.Context, consumerGroup, topic strin
 func (s *BrokerServer) CreateTopic(ctx context.Context, req *pb.CreateTopicRequest) (*pb.CreateTopicResponse, error) {
 	partitions := req.Partitions
 	if partitions <= 0 {
-		partitions = 3 // 默认 3 个分区
+		partitions = 3
 	}
 
 	for i := int32(0); i < partitions; i++ {
@@ -92,28 +93,26 @@ func (s *BrokerServer) CreateTopic(ctx context.Context, req *pb.CreateTopicReque
 		}
 	}
 
-	// 如果指定了 TTL，同步设置
 	if req.TtlSeconds > 0 {
 		_, err := s.storageClient.SetTTL(ctx, &storagepb.SetTTLRequest{
 			Topic:      req.Topic,
 			TtlSeconds: req.TtlSeconds,
 		})
 		if err != nil {
-			fmt.Printf("设置 Topic TTL 失败: %v\n", err)
+			log.WithContext(ctx).Error("设置 Topic TTL 失败", "topic", req.Topic, "error", err)
 		}
 	}
 
 	return &pb.CreateTopicResponse{Success: true}, nil
 }
 
-// ensureTopicExists 确保 Topic 存在，不存在则创建默认分区
+// ensureTopicExists 确保 Topic 存在
 func (s *BrokerServer) ensureTopicExists(ctx context.Context, topic string) error {
 	resp, err := s.storageClient.ListPartitions(ctx, &storagepb.ListPartitionsRequest{Topic: topic})
 	if err == nil && resp.Success && len(resp.Partitions) > 0 {
 		return nil
 	}
 
-	// 不存在，创建默认 3 个分区
 	for i := int32(0); i < 3; i++ {
 		_, err := s.storageClient.CreatePartition(ctx, &storagepb.CreatePartitionRequest{
 			Topic:       topic,
@@ -129,27 +128,23 @@ func (s *BrokerServer) ensureTopicExists(ctx context.Context, topic string) erro
 // Stream 处理客户端双向流连接
 func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 	ctx := stream.Context()
-	clientID := fmt.Sprintf("broker_client_%d", time.Now().UnixNano())
+	streamID := uuid.New().String()[:8]
 
-	fmt.Printf("客户端连接: %s\n", clientID)
-	defer fmt.Printf("客户端断开: %s\n", clientID)
+	log.WithContext(ctx).Info("新客户端流连接", "streamID", streamID)
+	defer log.WithContext(ctx).Info("客户端流断开", "streamID", streamID)
 
 	var (
 		consumerID       string
 		consumerGroup    string
 		subscribedTopics []string
-		pullInterval     = 100 * time.Millisecond // 默认 100ms
+		pullInterval     = 100 * time.Millisecond
 	)
 
-	// 消息发送通道
 	messageChan := make(chan *pb.ConsumeMessage, 100)
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 
-	// 内存中的发送进度，防止重复推送 (key: topic-partition)
-	sendingOffsets := make(map[string]int64)
-
-	// 1. 消息发送协程 (Gateway 职责)
+	// 1. 下行推送协程
 	go func() {
 		for {
 			select {
@@ -165,14 +160,14 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 					},
 				}
 				if err := stream.Send(streamMsg); err != nil {
-					fmt.Printf("发送消息失败: %v\n", err)
+					log.WithContext(ctx).Error("推送消息失败", "streamID", streamID, "error", err)
 					return
 				}
 			}
 		}
 	}()
 
-	// 2. 消息轮询拉取协程 (Dispatcher 职责)
+	// 2. 轮询拉取协程
 	pullTicker := time.NewTicker(pullInterval)
 	defer pullTicker.Stop()
 
@@ -184,14 +179,11 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 			case <-stopChan:
 				return
 			case <-pullTicker.C:
-				// 如果订阅时修改了 pullInterval，这里需要更新 Ticker
-				// 简化实现：Ticker 在流生命周期内保持 Subscribe 时的设定
 				if consumerID == "" || consumerGroup == "" {
 					continue
 				}
 
 				for _, topic := range subscribedTopics {
-					// 1. 获取当前消费者的分配方案
 					assignResp, err := s.storageClient.GetGroupAssignment(ctx, &storagepb.GetGroupAssignmentRequest{
 						ConsumerGroup: consumerGroup,
 						Topic:         topic,
@@ -200,7 +192,6 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 						continue
 					}
 
-					// 2. 筛选出属于当前消费者的分区
 					var myPartitions []int32
 					for partID, assignedConsumerID := range assignResp.PartitionAssignment {
 						if assignedConsumerID == consumerID {
@@ -208,35 +199,25 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 						}
 					}
 
-					// 3. 为每个分配的分区拉取消息
 					for _, partID := range myPartitions {
-						key := fmt.Sprintf("%s-%d", topic, partID)
-
-						// 如果内存中没有发送进度，则从 Storage 获取当前已确认的偏移量作为起点
-						if _, exists := sendingOffsets[key]; !exists {
-							offsetResp, err := s.storageClient.GetOffset(ctx, &storagepb.GetOffsetRequest{
-								ConsumerGroup: consumerGroup,
-								Topic:         topic,
-								PartitionId:   partID,
-							})
-							if err != nil || !offsetResp.Success {
-								continue
-							}
-							sendingOffsets[key] = offsetResp.Offset
+						offsetResp, err := s.storageClient.GetOffset(ctx, &storagepb.GetOffsetRequest{
+							ConsumerGroup: consumerGroup,
+							Topic:         topic,
+							PartitionId:   partID,
+						})
+						if err != nil || !offsetResp.Success {
+							continue
 						}
 
 						resp, err := s.storageClient.ReadMessages(ctx, &storagepb.ReadMessagesRequest{
 							Topic:       topic,
 							PartitionId: partID,
-							Offset:      sendingOffsets[key],
+							Offset:      offsetResp.Offset,
 							Limit:       10,
 						})
 						if err != nil || !resp.Success || len(resp.Messages) == 0 {
 							continue
 						}
-
-						// 更新内存发送进度：下一次从这一批的最后一条消息之后开始拉取
-						sendingOffsets[key] = resp.Messages[len(resp.Messages)-1].Offset + 1
 
 						for _, m := range resp.Messages {
 							select {
@@ -262,7 +243,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 		}
 	}()
 
-	// 3. 处理接收消息
+	// 3. 上行接收循环
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
@@ -281,12 +262,9 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 			consumerID = req.ConsumerId
 			consumerGroup = req.ConsumerGroup
 			subscribedTopics = append(subscribedTopics, req.Topic)
-			if req.ClientId != "" {
-				clientID = req.ClientId
-			}
 			if req.PullIntervalMs > 0 {
 				pullInterval = time.Duration(req.PullIntervalMs) * time.Millisecond
-				pullTicker.Reset(pullInterval) // 动态更新拉取间隔
+				pullTicker.Reset(pullInterval)
 			}
 			s.handleSubscribe(ctx, stream, req)
 
@@ -298,7 +276,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 		}
 	}
 
-	// 4. 清理：通知 Storage 消费者下线
+	// 4. 断开连接清理
 	if consumerID != "" {
 		for _, topic := range subscribedTopics {
 			s.storageClient.DeleteConsumer(context.Background(), &storagepb.DeleteConsumerRequest{
@@ -306,7 +284,6 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 				ConsumerGroup: consumerGroup,
 				Topic:         topic,
 			})
-			// 触发重平衡
 			s.rebalance(context.Background(), consumerGroup, topic)
 		}
 	}
@@ -315,9 +292,8 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 }
 
 func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.PublishRequest) {
-	// 确保 Topic 存在
 	if err := s.ensureTopicExists(ctx, req.Topic); err != nil {
-		fmt.Printf("自动创建 Topic 失败: %v\n", err)
+		log.WithContext(ctx).Error("自动创建 Topic 失败", "topic", req.Topic, "error", err)
 	}
 
 	partitionID := req.PartitionId
@@ -334,13 +310,15 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 	msgID := uuid.New().String()
 	storageResp, err := s.storageClient.WriteMessage(ctx, &storagepb.WriteMessageRequest{
 		Message: &storagepb.Message{
-			Id:          msgID,
-			Topic:       req.Topic,
-			PartitionId: partitionID,
-			Payload:     req.Payload,
-			Properties:  req.Properties,
-			Timestamp:   time.Now().Unix(),
-			Qos:         int32(req.Qos),
+			Id:             msgID,
+			Topic:          req.Topic,
+			PartitionId:    partitionID,
+			Payload:        req.Payload,
+			Properties:     req.Properties,
+			Timestamp:      time.Now().Unix(),
+			Qos:            int32(req.Qos),
+			ProducerId:     req.ProducerId,
+			SequenceNumber: req.SequenceNumber,
 		},
 	})
 
@@ -365,7 +343,6 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 }
 
 func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.SubscribeRequest) {
-	// 1. 持久化消费者状态到 Storage
 	_, err := s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
 		Consumer: &storagepb.ConsumerState{
 			ConsumerId:         req.ConsumerId,
@@ -376,7 +353,6 @@ func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService
 		},
 	})
 
-	// 2. 触发重平衡
 	if err == nil {
 		s.rebalance(ctx, req.ConsumerGroup, req.Topic)
 	}
@@ -401,7 +377,7 @@ func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_Strea
 		ConsumerGroup: req.ConsumerGroup,
 		Topic:         req.Topic,
 		PartitionId:   req.PartitionId,
-		Offset:        req.Offset + 1, // 确认为下一条消息的偏移量
+		Offset:        req.Offset + 1,
 	})
 
 	resp := &pb.AckResponse{RequestId: req.RequestId, Success: err == nil}
@@ -416,7 +392,6 @@ func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_Strea
 }
 
 func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.HeartbeatRequest) {
-	// 更新心跳状态到 Storage
 	s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
 		Consumer: &storagepb.ConsumerState{
 			ConsumerId:    req.ConsumerId,
@@ -424,9 +399,6 @@ func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService
 			LastHeartbeat: time.Now().Unix(),
 		},
 	})
-
-	// 实际生产环境这里可能会根据心跳超时情况触发 rebalance
-	// 简化实现：心跳仅更新时间
 
 	stream.Send(&pb.StreamMessage{
 		Type:    pb.MessageType_MESSAGE_TYPE_HEARTBEAT_RESPONSE,
@@ -436,14 +408,13 @@ func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService
 
 func main() {
 	flag.Parse()
+	log.Init(*logLevel)
 
-	fmt.Printf("Broker Service (Gateway + Dispatcher) 启动中...\n")
-	fmt.Printf("监听地址: %s\n", *addr)
-	fmt.Printf("Storage地址: %s\n", *storageAddr)
+	log.Info("Broker Service 启动中", "addr", *addr, "storage", *storageAddr)
 
 	conn, err := grpc.Dial(*storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		fmt.Printf("连接 Storage Service 失败: %v\n", err)
+		log.Error("连接 Storage 失败", "error", err)
 		os.Exit(1)
 	}
 	defer conn.Close()
@@ -456,13 +427,13 @@ func main() {
 
 	listener, err := net.Listen("tcp", *addr)
 	if err != nil {
-		fmt.Printf("监听端口失败: %v\n", err)
+		log.Error("监听端口失败", "error", err)
 		os.Exit(1)
 	}
 
 	go func() {
 		if err := grpcServer.Serve(listener); err != nil {
-			fmt.Printf("服务器错误: %v\n", err)
+			log.Error("服务运行异常", "error", err)
 			os.Exit(1)
 		}
 	}()
@@ -471,6 +442,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	fmt.Println("\n正在关闭 Broker Service...")
+	log.Info("正在优雅关闭 Broker...")
 	grpcServer.GracefulStop()
+	log.Info("服务已关闭")
 }

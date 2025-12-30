@@ -7,17 +7,37 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// MessageContext 消息处理上下文
+type MessageContext interface {
+	context.Context
+	Message() *pb.ConsumeMessage
+	Ack() error
+}
+
+type messageContext struct {
+	context.Context
+	msg      *pb.ConsumeMessage
+	consumer *Consumer
+}
+
+func (m *messageContext) Message() *pb.ConsumeMessage { return m.msg }
+func (m *messageContext) Ack() error                  { return m.consumer.Ack(m.Context, m.msg) }
+
 // MessageHandler 消息处理函数
-type MessageHandler func(msg *pb.ConsumeMessage) error
+type MessageHandler func(ctx MessageContext) error
 
 // ErrorHandler 错误处理函数
 type ErrorHandler func(err error)
+
+// rawMessageHandler 基础消息处理函数（内部使用）
+type rawMessageHandler func(*pb.ConsumeMessage) error
 
 // baseClient 内部共享的基础客户端
 type baseClient struct {
@@ -37,39 +57,61 @@ type baseClient struct {
 	consumerID    string
 	consumerGroup string
 	clientID      string
+	serverAddr    string
+	isClosed      bool
 }
 
 func newBaseClient(addr string, errHandler ErrorHandler) (*baseClient, error) {
-	conn, err := grpc.Dial(addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-		grpc.WithTimeout(5*time.Second))
-	if err != nil {
-		return nil, fmt.Errorf("连接服务器失败: %w", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 	bc := &baseClient{
-		conn:            conn,
-		client:          pb.NewGMQServiceClient(conn),
-		ctx:             ctx,
-		cancel:          cancel,
+		serverAddr:      addr,
 		errorHandler:    errHandler,
 		pendingRequests: make(map[string]chan *pb.StreamMessage),
 	}
 
-	stream, err := bc.client.Stream(ctx)
-	if err != nil {
-		conn.Close()
-		cancel()
-		return nil, fmt.Errorf("建立流连接失败: %w", err)
+	if err := bc.connect(); err != nil {
+		return nil, err
 	}
-	bc.stream = stream
 
 	return bc, nil
 }
 
+func (c *baseClient) connect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.conn != nil {
+		c.conn.Close()
+	}
+
+	conn, err := grpc.Dial(c.serverAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithTimeout(5*time.Second))
+	if err != nil {
+		return fmt.Errorf("连接服务器失败: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c.conn = conn
+	c.client = pb.NewGMQServiceClient(conn)
+	c.ctx = ctx
+	c.cancel = cancel
+
+	stream, err := c.client.Stream(ctx)
+	if err != nil {
+		conn.Close()
+		cancel()
+		return fmt.Errorf("建立流连接失败: %w", err)
+	}
+	c.stream = stream
+	return nil
+}
+
 func (c *baseClient) Close() error {
+	c.mu.Lock()
+	c.isClosed = true
+	c.mu.Unlock()
+
 	c.cancel()
 	c.mu.Lock()
 	if c.stream != nil {
@@ -83,35 +125,80 @@ func (c *baseClient) Close() error {
 	return nil
 }
 
-func (c *baseClient) receiveLoop(msgHandler MessageHandler) {
+func (c *baseClient) receiveLoop(msgHandler rawMessageHandler, onReconnect func()) {
 	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-			msg, err := c.stream.Recv()
-			if err != nil {
-				if err == io.EOF {
-					return
-				}
-				if c.errorHandler != nil {
-					c.errorHandler(err)
-				}
+		if c.ctx.Err() != nil {
+			// 如果 context 已取消且不是主动关闭，则尝试重连
+			c.mu.RLock()
+			closed := c.isClosed
+			c.mu.RUnlock()
+			if closed {
 				return
 			}
-			c.handleStreamMessage(msg, msgHandler)
+			c.reconnect(msgHandler, onReconnect)
+			return
+		}
+
+		msg, err := c.stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				log.Info("服务器已关闭连接，尝试重连...")
+			} else {
+				log.Error("接收流消息失败，准备重连", "error", err)
+			}
+			
+			c.mu.RLock()
+			closed := c.isClosed
+			c.mu.RUnlock()
+			if closed {
+				return
+			}
+
+			c.reconnect(msgHandler, onReconnect)
+			return
+		}
+		c.handleStreamMessage(msg, msgHandler)
+	}
+}
+
+func (c *baseClient) reconnect(msgHandler rawMessageHandler, onReconnect func()) {
+	backoff := 1 * time.Second
+	maxBackoff := 30 * time.Second
+
+	for {
+		c.mu.RLock()
+		if c.isClosed {
+			c.mu.RUnlock()
+			return
+		}
+		c.mu.RUnlock()
+
+		log.Info("正在尝试重新连接...", "addr", c.serverAddr, "wait", backoff)
+		time.Sleep(backoff)
+
+		if err := c.connect(); err == nil {
+			log.Info("重连成功")
+			// 重新启动接收循环
+			go c.receiveLoop(msgHandler, onReconnect)
+			// 执行重连后的恢复逻辑（如重订阅）
+			if onReconnect != nil {
+				onReconnect()
+			}
+			return
+		}
+
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
 		}
 	}
 }
 
-func (c *baseClient) handleStreamMessage(msg *pb.StreamMessage, msgHandler MessageHandler) {
+func (c *baseClient) handleStreamMessage(msg *pb.StreamMessage, msgHandler rawMessageHandler) {
 	switch msg.Type {
 	case pb.MessageType_MESSAGE_TYPE_CONSUME_MESSAGE:
 		if msgHandler != nil {
-			consumeMsg := msg.GetConsumeMsg()
-			if err := msgHandler(consumeMsg); err == nil && consumeMsg.Qos == pb.QoS_QOS_AT_LEAST_ONCE {
-				// 基础 Ack 逻辑可以放在这里或由 Consumer 处理
-			}
+			msgHandler(msg.GetConsumeMsg())
 		}
 	case pb.MessageType_MESSAGE_TYPE_PUBLISH_RESPONSE,
 		pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_RESPONSE,
@@ -137,7 +224,9 @@ func (c *baseClient) handleStreamMessage(msg *pb.StreamMessage, msgHandler Messa
 		}
 	case pb.MessageType_MESSAGE_TYPE_ERROR_RESPONSE:
 		if c.errorHandler != nil {
-			c.errorHandler(fmt.Errorf("服务器错误: %s", msg.GetErrorResp().Message))
+			err := fmt.Errorf("服务器错误: %s", msg.GetErrorResp().Message)
+			c.errorHandler(err)
+			log.Error("收到服务器错误响应", "error", err)
 		}
 	}
 }
@@ -168,10 +257,14 @@ func (c *baseClient) heartbeatLoop() {
 // Producer 生产者客户端
 type Producer struct {
 	*baseClient
+	producerID     string
+	sequenceNumber int64
+	seqMu          sync.Mutex
 }
 
 type ProducerConfig struct {
 	ServerAddr   string
+	ProducerID   string // 生产者 ID，用于幂等
 	ClientID     string
 	ErrorHandler ErrorHandler
 }
@@ -188,17 +281,32 @@ func NewProducer(cfg *ProducerConfig) (*Producer, error) {
 		bc.clientID = cfg.ClientID
 	}
 
-	p := &Producer{baseClient: bc}
-	go p.receiveLoop(nil)
+	producerID := cfg.ProducerID
+	if producerID == "" {
+		producerID = "prod-" + uuid.New().String()[:8]
+	}
+
+	p := &Producer{
+		baseClient: bc,
+		producerID: producerID,
+	}
+	go p.receiveLoop(nil, nil)
 	return p, nil
 }
 
 func (p *Producer) Publish(ctx context.Context, topic string, payload []byte, opts ...PublishOption) (*pb.PublishResponse, error) {
+	p.seqMu.Lock()
+	p.sequenceNumber++
+	seq := p.sequenceNumber
+	p.seqMu.Unlock()
+
 	req := &pb.PublishRequest{
-		RequestId: uuid.New().String(),
-		Topic:     topic,
-		Payload:   payload,
-		Qos:       pb.QoS_QOS_AT_MOST_ONCE,
+		RequestId:      uuid.New().String(),
+		Topic:          topic,
+		Payload:        payload,
+		Qos:            pb.QoS_QOS_AT_MOST_ONCE,
+		ProducerId:     p.producerID,
+		SequenceNumber: seq,
 	}
 	for _, opt := range opts {
 		opt(req)
@@ -259,6 +367,10 @@ type Consumer struct {
 	pullIntervalMs int32
 	msgChan        chan *pb.ConsumeMessage // 内部消息队列
 	workerWg       sync.WaitGroup
+
+	// 自动重连时恢复订阅
+	subscribedTopics map[string][]SubscribeOption
+	subMu            sync.RWMutex
 }
 
 type ConsumerConfig struct {
@@ -300,20 +412,35 @@ func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	}
 
 	c := &Consumer{
-		baseClient:     bc,
-		messageHandler: cfg.MessageHandler,
-		pullIntervalMs: cfg.PullIntervalMs,
-		msgChan:        make(chan *pb.ConsumeMessage, cfg.PrefetchCount),
+		baseClient:       bc,
+		messageHandler:   cfg.MessageHandler,
+		pullIntervalMs:   cfg.PullIntervalMs,
+		msgChan:          make(chan *pb.ConsumeMessage, cfg.PrefetchCount),
+		subscribedTopics: make(map[string][]SubscribeOption),
 	}
 
-	// 启动接收循环 (将消息放入 msgChan)
-	go c.receiveLoop(c.enqueueMessage)
+	// 启动接收循环 (将消息放入 msgChan)，并注册重连回调
+	go c.receiveLoop(c.enqueueMessage, c.onReconnect)
 	// 启动消息处理 Worker
 	go c.startWorker()
 	// 启动心跳
 	go c.heartbeatLoop()
 
 	return c, nil
+}
+
+func (c *Consumer) onReconnect() {
+	log.Info("正在恢复订阅...")
+	c.subMu.RLock()
+	defer c.subMu.RUnlock()
+
+	for topic, opts := range c.subscribedTopics {
+		if err := c.Subscribe(context.Background(), topic, opts...); err != nil {
+			log.Error("恢复订阅失败", "topic", topic, "error", err)
+		} else {
+			log.Info("订阅已恢复", "topic", topic)
+		}
+	}
 }
 
 // enqueueMessage 仅仅负责将消息放入队列，不处理业务逻辑，不会阻塞接收循环
@@ -340,18 +467,26 @@ func (c *Consumer) startWorker() {
 				return
 			}
 			if c.messageHandler != nil {
-				// 执行用户业务逻辑
-				err := c.messageHandler(msg)
-				if err == nil && msg.Qos == pb.QoS_QOS_AT_LEAST_ONCE {
-					// 自动 Ack
-					c.Ack(context.Background(), msg)
+				// 创建消息上下文
+				mctx := &messageContext{
+					Context:  c.ctx,
+					msg:      msg,
+					consumer: c,
 				}
+				// 执行用户业务逻辑
+				// 生产环境下建议由用户在 Handler 内部通过 ctx.Ack() 显式确认
+				_ = c.messageHandler(mctx)
 			}
 		}
 	}
 }
 
 func (c *Consumer) Subscribe(ctx context.Context, topic string, opts ...SubscribeOption) error {
+	// 记录订阅信息以便重连
+	c.subMu.Lock()
+	c.subscribedTopics[topic] = opts
+	c.subMu.Unlock()
+
 	req := &pb.SubscribeRequest{
 		RequestId:      uuid.New().String(),
 		Topic:          topic,

@@ -1,7 +1,24 @@
 version: '3.8'
 
 services:
-  # Storage Service - 存储服务
+  # DragonflyDB - 高性能 Redis 兼容存储
+  dragonfly:
+    image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
+    container_name: gmq-dragonfly
+    ports:
+      - "6379:6379"
+    ulimits:
+      memlock: -1
+    networks:
+      - gmq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Storage Service - 存储服务 (负责对接 Dragonfly)
   storage:
     build:
       context: .
@@ -9,22 +26,22 @@ services:
       target: storage
     container_name: gmq-storage
     hostname: storage
-    command: ["/app/gmq-storage-service", "-addr", ":50052", "-data", "/data"]
+    command: ["/app/gmq-storage-service", "-addr", ":50052", "-redis-addr", "dragonfly:6379"]
     ports:
       - "50052:50052"
-    volumes:
-      - storage-data:/data
     networks:
       - gmq-network
+    depends_on:
+      dragonfly:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "50052"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
 
-  # Broker Service - 网关 + 分发服务（无状态，可水平扩展）
+  # Broker Service - 连接 + 分发服务
   broker:
     build:
       context: .
@@ -49,19 +66,11 @@ services:
     restart: unless-stopped
     deploy:
       replicas: 1
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "50051"]
       interval: 10s
       timeout: 5s
       retries: 3
-
-volumes:
-  storage-data:
-    driver: local
 
 networks:
   gmq-network:

@@ -60,11 +60,12 @@ enum MessageType {
 
 // QoS 级别
 enum QoS {
-  QOS_UNSPECIFIED = 0;
-  // 至多一次
-  QOS_AT_MOST_ONCE = 1;
-  // 至少一次
-  QOS_AT_LEAST_ONCE = 2;
+  // 至多一次 (Fire and Forget)
+  QOS_AT_MOST_ONCE = 0;
+  // 至少一次 (Acknowledged)
+  QOS_AT_LEAST_ONCE = 1;
+  // 严格一次 (Exactly Once)
+  QOS_EXACTLY_ONCE = 2;
 }
 
 // 发布消息请求
@@ -83,6 +84,9 @@ message PublishRequest {
   map<string, string> properties = 6;
   // QoS 级别
   QoS qos = 7;
+  // 生产端幂等支持
+  string producer_id = 8;
+  int64 sequence_number = 9;
 }
 
 // 发布消息响应

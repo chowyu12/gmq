@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -11,19 +10,19 @@ import (
 	"time"
 
 	"github.com/chowyu12/gmq/internal/storage"
+	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto/storage"
 	"google.golang.org/grpc"
 )
 
 var (
-	addr      = flag.String("addr", ":50052", "Storage服务监听地址")
-	engine    = flag.String("engine", "file", "存储引擎: file 或 redis")
-	dataDir   = flag.String("data", "./storage-data", "文件引擎数据目录")
-	redisAddr = flag.String("redis-addr", "localhost:6379", "Redis/Dragonfly 地址")
+	addr      = flag.String("addr", ":50052", "Storage 服务监听地址")
+	redisAddr = flag.String("redis-addr", "localhost:6379", "Redis/DragonflyDB 地址")
 	redisPass = flag.String("redis-pass", "", "Redis 密码")
+	logLevel  = flag.String("log-level", "info", "日志级别: debug, info, warn, error")
 )
 
-// StorageServer Storage服务实现
+// StorageServer 存储服务实现
 type StorageServer struct {
 	pb.UnimplementedStorageServiceServer
 	store storage.Storage
@@ -40,17 +39,20 @@ func NewStorageServer(store storage.Storage) *StorageServer {
 func (s *StorageServer) WriteMessage(ctx context.Context, req *pb.WriteMessageRequest) (*pb.WriteMessageResponse, error) {
 	msg := req.Message
 	internalMsg := &storage.Message{
-		ID:          msg.Id,
-		Topic:       msg.Topic,
-		PartitionID: msg.PartitionId,
-		Payload:     msg.Payload,
-		Properties:  msg.Properties,
-		Timestamp:   msg.Timestamp,
-		QoS:         msg.Qos,
+		ID:             msg.Id,
+		Topic:          msg.Topic,
+		PartitionID:    msg.PartitionId,
+		Payload:        msg.Payload,
+		Properties:     msg.Properties,
+		Timestamp:      msg.Timestamp,
+		QoS:            msg.Qos,
+		ProducerID:     msg.ProducerId,
+		SequenceNumber: msg.SequenceNumber,
 	}
 
 	offset, err := s.store.WriteMessage(ctx, internalMsg)
 	if err != nil {
+		log.WithContext(ctx).Error("写入消息失败", "topic", msg.Topic, "error", err)
 		return &pb.WriteMessageResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
 
@@ -60,20 +62,23 @@ func (s *StorageServer) WriteMessage(ctx context.Context, req *pb.WriteMessageRe
 func (s *StorageServer) ReadMessages(ctx context.Context, req *pb.ReadMessagesRequest) (*pb.ReadMessagesResponse, error) {
 	messages, err := s.store.ReadMessages(ctx, req.Topic, req.PartitionId, req.Offset, int(req.Limit))
 	if err != nil {
+		log.WithContext(ctx).Error("读取消息失败", "topic", req.Topic, "error", err)
 		return &pb.ReadMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
 
 	pbMessages := make([]*pb.Message, len(messages))
 	for i, msg := range messages {
 		pbMessages[i] = &pb.Message{
-			Id:          msg.ID,
-			Topic:       msg.Topic,
-			PartitionId: msg.PartitionID,
-			Offset:      msg.Offset,
-			Payload:     msg.Payload,
-			Properties:  msg.Properties,
-			Timestamp:   msg.Timestamp,
-			Qos:         msg.QoS,
+			Id:             msg.ID,
+			Topic:          msg.Topic,
+			PartitionId:    msg.PartitionID,
+			Offset:         msg.Offset,
+			Payload:        msg.Payload,
+			Properties:     msg.Properties,
+			Timestamp:      msg.Timestamp,
+			Qos:            msg.QoS,
+			ProducerId:     msg.ProducerID,
+			SequenceNumber: msg.SequenceNumber,
 		}
 	}
 
@@ -208,58 +213,40 @@ func (s *StorageServer) GetGroupAssignment(ctx context.Context, req *pb.GetGroup
 
 func main() {
 	flag.Parse()
+	log.Init(*logLevel)
 
-	fmt.Printf("Storage Service 启动中 (Engine: %s)...\n", *engine)
+	log.Info("Storage Service 启动中", "engine", "Redis/DragonflyDB")
 
-	var store storage.Storage
-	var err error
-
-	if *engine == "redis" {
-		store, err = storage.NewRedisStorage(*redisAddr, *redisPass, 0)
-		if err != nil {
-			fmt.Printf("创建 Redis 存储失败: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
-		// 默认使用文件引擎
-		// 文件引擎目前需要同时包含 FileStorage 和 SQLStateStorage 的逻辑
-		// 为了简化，我们暂时保留旧的 FileStorage 实现，但它需要适配新的统一接口
-		// 实际上我们应该重构 FileStorage 使其实现 storage.Storage 接口
-		// 这里假设 FileStorage 已经通过某种方式合并了逻辑或实现了接口
-		store, err = storage.NewFileStorage(*dataDir)
-		if err != nil {
-			fmt.Printf("创建文件存储失败: %v\n", err)
-			os.Exit(1)
-		}
+	store, err := storage.NewRedisStorage(*redisAddr, *redisPass, 0)
+	if err != nil {
+		log.Error("初始化存储失败", "error", err)
+		os.Exit(1)
 	}
 	defer store.Close()
 
-	// 创建 gRPC 服务器
 	grpcServer := grpc.NewServer()
 	storageServer := NewStorageServer(store)
 	pb.RegisterStorageServiceServer(grpcServer, storageServer)
 
-	// 监听端口
 	listener, err := net.Listen("tcp", *addr)
 	if err != nil {
-		fmt.Printf("监听端口失败: %v\n", err)
+		log.Error("监听端口失败", "error", err)
 		os.Exit(1)
 	}
 
 	go func() {
-		fmt.Printf("Storage Service 已在 %s 启动\n", *addr)
+		log.Info("gRPC 服务启动", "addr", *addr)
 		if err := grpcServer.Serve(listener); err != nil {
-			fmt.Printf("服务器错误: %v\n", err)
+			log.Error("服务运行异常", "error", err)
 			os.Exit(1)
 		}
 	}()
 
-	// 等待退出信号
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	fmt.Println("\n正在关闭 Storage Service...")
+	log.Info("正在优雅关闭服务...")
 	grpcServer.GracefulStop()
-	fmt.Println("Storage Service 已关闭")
+	log.Info("服务已关闭")
 }

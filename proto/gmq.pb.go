@@ -7,12 +7,11 @@
 package gmq
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -110,24 +109,25 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 type QoS int32
 
 const (
-	QoS_QOS_UNSPECIFIED QoS = 0
-	// 至多一次
-	QoS_QOS_AT_MOST_ONCE QoS = 1
-	// 至少一次
-	QoS_QOS_AT_LEAST_ONCE QoS = 2
+	// 至多一次 (Fire and Forget)
+	QoS_QOS_AT_MOST_ONCE QoS = 0
+	// 至少一次 (Acknowledged)
+	QoS_QOS_AT_LEAST_ONCE QoS = 1
+	// 严格一次 (Exactly Once)
+	QoS_QOS_EXACTLY_ONCE QoS = 2
 )
 
 // Enum value maps for QoS.
 var (
 	QoS_name = map[int32]string{
-		0: "QOS_UNSPECIFIED",
-		1: "QOS_AT_MOST_ONCE",
-		2: "QOS_AT_LEAST_ONCE",
+		0: "QOS_AT_MOST_ONCE",
+		1: "QOS_AT_LEAST_ONCE",
+		2: "QOS_EXACTLY_ONCE",
 	}
 	QoS_value = map[string]int32{
-		"QOS_UNSPECIFIED":   0,
-		"QOS_AT_MOST_ONCE":  1,
-		"QOS_AT_LEAST_ONCE": 2,
+		"QOS_AT_MOST_ONCE":  0,
+		"QOS_AT_LEAST_ONCE": 1,
+		"QOS_EXACTLY_ONCE":  2,
 	}
 )
 
@@ -396,9 +396,12 @@ type PublishRequest struct {
 	// 消息属性
 	Properties map[string]string `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// QoS 级别
-	Qos           QoS `protobuf:"varint,7,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Qos QoS `protobuf:"varint,7,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
+	// 生产端幂等支持
+	ProducerId     string `protobuf:"bytes,8,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
+	SequenceNumber int64  `protobuf:"varint,9,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PublishRequest) Reset() {
@@ -477,7 +480,21 @@ func (x *PublishRequest) GetQos() QoS {
 	if x != nil {
 		return x.Qos
 	}
-	return QoS_QOS_UNSPECIFIED
+	return QoS_QOS_AT_MOST_ONCE
+}
+
+func (x *PublishRequest) GetProducerId() string {
+	if x != nil {
+		return x.ProducerId
+	}
+	return ""
+}
+
+func (x *PublishRequest) GetSequenceNumber() int64 {
+	if x != nil {
+		return x.SequenceNumber
+	}
+	return 0
 }
 
 // 发布消息响应
@@ -656,7 +673,7 @@ func (x *SubscribeRequest) GetQos() QoS {
 	if x != nil {
 		return x.Qos
 	}
-	return QoS_QOS_UNSPECIFIED
+	return QoS_QOS_AT_MOST_ONCE
 }
 
 func (x *SubscribeRequest) GetPartitions() []int32 {
@@ -972,7 +989,7 @@ func (x *ConsumeMessage) GetQos() QoS {
 	if x != nil {
 		return x.Qos
 	}
-	return QoS_QOS_UNSPECIFIED
+	return QoS_QOS_AT_MOST_ONCE
 }
 
 // 消息确认请求
@@ -1316,7 +1333,7 @@ const file_proto_gmq_proto_rawDesc = "" +
 	" \x01(\v2\x16.gmq.HeartbeatResponseH\x00R\rheartbeatResp\x123\n" +
 	"\n" +
 	"error_resp\x18\v \x01(\v2\x12.gmq.ErrorResponseH\x00R\terrorRespB\t\n" +
-	"\apayload\"\xc7\x02\n" +
+	"\apayload\"\x91\x03\n" +
 	"\x0ePublishRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
@@ -1327,7 +1344,10 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\n" +
 	"properties\x18\x06 \x03(\v2#.gmq.PublishRequest.PropertiesEntryR\n" +
 	"properties\x12\x1a\n" +
-	"\x03qos\x18\a \x01(\x0e2\b.gmq.QoSR\x03qos\x1a=\n" +
+	"\x03qos\x18\a \x01(\x0e2\b.gmq.QoSR\x03qos\x12\x1f\n" +
+	"\vproducer_id\x18\b \x01(\tR\n" +
+	"producerId\x12'\n" +
+	"\x0fsequence_number\x18\t \x01(\x03R\x0esequenceNumber\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc7\x01\n" +
@@ -1422,15 +1442,15 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x1eMESSAGE_TYPE_HEARTBEAT_REQUEST\x10\b\x12#\n" +
 	"\x1fMESSAGE_TYPE_HEARTBEAT_RESPONSE\x10\t\x12\x1f\n" +
 	"\x1bMESSAGE_TYPE_ERROR_RESPONSE\x10\n" +
-	"*G\n" +
-	"\x03QoS\x12\x13\n" +
-	"\x0fQOS_UNSPECIFIED\x10\x00\x12\x14\n" +
-	"\x10QOS_AT_MOST_ONCE\x10\x01\x12\x15\n" +
-	"\x11QOS_AT_LEAST_ONCE\x10\x022\x84\x01\n" +
+	"*H\n" +
+	"\x03QoS\x12\x14\n" +
+	"\x10QOS_AT_MOST_ONCE\x10\x00\x12\x15\n" +
+	"\x11QOS_AT_LEAST_ONCE\x10\x01\x12\x14\n" +
+	"\x10QOS_EXACTLY_ONCE\x10\x022\x84\x01\n" +
 	"\n" +
 	"GMQService\x124\n" +
 	"\x06Stream\x12\x12.gmq.StreamMessage\x1a\x12.gmq.StreamMessage(\x010\x01\x12@\n" +
-	"\vCreateTopic\x12\x17.gmq.CreateTopicRequest\x1a\x18.gmq.CreateTopicResponseB!Z\x1fgithub.com/chowyu12/gmq/proto;gmqb\x06proto3"
+	"\vCreateTopic\x12\x17.gmq.CreateTopicRequest\x1a\x18.gmq.CreateTopicResponseB#Z!github.com/chowyu12/gmq/proto;gmqb\x06proto3"
 
 var (
 	file_proto_gmq_proto_rawDescOnce sync.Once

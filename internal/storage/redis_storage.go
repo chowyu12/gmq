@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chowyu12/gmq/pkg/log"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -39,9 +40,46 @@ func (r *RedisStorage) streamKey(topic string, partitionID int32) string {
 	return fmt.Sprintf("gmq:stream:%s:%d", topic, partitionID)
 }
 
+// 辅助函数：将 Redis ID 字符串 (timestamp-seq) 编码为 int64
+func encodeOffset(id string) int64 {
+	parts := strings.Split(id, "-")
+	if len(parts) != 2 {
+		return 0
+	}
+	ts, _ := strconv.ParseInt(parts[0], 10, 64)
+	seq, _ := strconv.ParseInt(parts[1], 10, 64)
+	// 高 44 位毫秒级时间戳，低 20 位序列号
+	// 这样可以确保 offset 是单调递增且不丢失 Redis ID 信息的
+	return (ts << 20) | (seq & 0xFFFFF)
+}
+
+// 辅助函数：将 int64 编码的 Offset 还原为 Redis ID 字符串
+func decodeOffset(offset int64) string {
+	if offset <= 0 {
+		return "-"
+	}
+	ts := offset >> 20
+	seq := offset & 0xFFFFF
+	return fmt.Sprintf("%d-%d", ts, seq)
+}
+
 func (r *RedisStorage) WriteMessage(ctx context.Context, msg *Message) (int64, error) {
+	// 1. 生产端幂等性检查
+	if msg.ProducerID != "" && msg.SequenceNumber > 0 {
+		dedupKey := fmt.Sprintf("gmq:dedup:%s:%s:%d", msg.Topic, msg.ProducerID, msg.SequenceNumber)
+		// 如果 key 已存在，说明是重复消息，直接返回成功并携带上次的 Offset (这里简化为返回 0，Broker 会处理)
+		set, err := r.client.SetNX(ctx, dedupKey, "1", 1*time.Hour).Result()
+		if err != nil {
+			return 0, err
+		}
+		if !set {
+			// 重复消息，从元数据获取之前的 Offset (可选，目前先返回 0)
+			return 0, nil
+		}
+	}
+
 	key := r.streamKey(msg.Topic, msg.PartitionID)
-	
+
 	// 获取 TTL 配置
 	ttlKey := fmt.Sprintf("gmq:meta:ttl:%s", msg.Topic)
 	ttlVal, _ := r.client.Get(ctx, ttlKey).Float64()
@@ -59,25 +97,22 @@ func (r *RedisStorage) WriteMessage(ctx context.Context, msg *Message) (int64, e
 	// 如果有 TTL，可以考虑限制 Stream 长度（简单粗暴但有效）
 	// 或者在读取时过滤。Redis Stream 暂不支持原生消息级 TTL
 	// 这里我们主要依赖读取时的逻辑过滤
-	
+
 	res, err := r.client.XAdd(ctx, args).Result()
 	if err != nil {
 		return 0, err
 	}
 
-	parts := strings.Split(res, "-")
-	offset, _ := strconv.ParseInt(parts[0], 10, 64)
-	return offset, nil
+	log.WithContext(ctx).Debug("写入消息成功", "topic", msg.Topic, "partition", msg.PartitionID, "id", res)
+	return encodeOffset(res), nil
 }
 
 func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error) {
 	key := r.streamKey(topic, partitionID)
 	
-	// 使用 XRANGE 读取消息
-	start := strconv.FormatInt(offset, 10)
-	if offset == 0 {
-		start = "-"
-	}
+	// 使用高精度解码后的 ID 作为起点
+	// 此时 offset 已经是下一条消息的预期起点
+	start := decodeOffset(offset)
 
 	res, err := r.client.XRangeN(ctx, key, start, "+", int64(limit)).Result()
 	if err != nil {
@@ -89,9 +124,8 @@ func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partition
 		var msg Message
 		if data, ok := xmsg.Values["data"].(string); ok {
 			json.Unmarshal([]byte(data), &msg)
-			// 更新真实的 Stream ID 作为 Offset
-			parts := strings.Split(xmsg.ID, "-")
-			msg.Offset, _ = strconv.ParseInt(parts[0], 10, 64)
+			// 使用编码后的完整 ID 作为 Offset 返回给客户端
+			msg.Offset = encodeOffset(xmsg.ID)
 			messages = append(messages, &msg)
 		}
 	}
@@ -140,7 +174,50 @@ func (r *RedisStorage) GetPartition(ctx context.Context, topic string, partition
 
 func (r *RedisStorage) UpdateOffset(ctx context.Context, group, topic string, partitionID int32, offset int64) error {
 	key := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
-	return r.client.HSet(ctx, key, strconv.Itoa(int(partitionID)), offset).Err()
+	err := r.client.HSet(ctx, key, strconv.Itoa(int(partitionID)), offset).Err()
+	if err != nil {
+		return err
+	}
+
+	// 触发物理清理：删除该分区中所有已被所有消费组确认的消息
+	return r.trimStream(ctx, topic, partitionID)
+}
+
+// trimStream 自动修剪 Stream，删除已被确认的消息
+func (r *RedisStorage) trimStream(ctx context.Context, topic string, partitionID int32) error {
+	streamKey := r.streamKey(topic, partitionID)
+
+	// 1. 获取订阅该 Topic 的所有消费组
+	// 注意：这里简化处理，在实际生产中可能需要一个专门的元数据 Key 来记录所有消费组
+	// 这里我们通过遍历 offset 相关的 keys 来模拟查找 (gmq:offsets:*)
+	iter := r.client.Scan(ctx, 0, "gmq:offsets:*", 0).Iterator()
+	var minOffset int64 = -1
+
+	for iter.Next(ctx) {
+		key := iter.Val() // 格式: gmq:offsets:group:topic
+		if !strings.HasSuffix(key, ":"+topic) {
+			continue
+		}
+
+		// 获取该组在该分区的 offset
+		val, err := r.client.HGet(ctx, key, strconv.Itoa(int(partitionID))).Result()
+		if err == nil {
+			offset, _ := strconv.ParseInt(val, 10, 64)
+			if minOffset == -1 || offset < minOffset {
+				minOffset = offset
+			}
+		}
+	}
+
+	// 2. 如果找到了最小已确认 offset，执行修剪
+	// Redis Stream ID 格式是 "timestamp-seq"，这里的 offset 对应的是 timestamp 部分
+	if minOffset > 0 {
+		trimID := fmt.Sprintf("%d-0", minOffset)
+		log.WithContext(ctx).Debug("修剪消息流", "topic", topic, "partition", partitionID, "minID", trimID)
+		return r.client.XTrimMinID(ctx, streamKey, trimID).Err()
+	}
+
+	return nil
 }
 
 func (r *RedisStorage) GetOffset(ctx context.Context, group, topic string, partitionID int32) (int64, error) {
@@ -195,13 +272,13 @@ func (r *RedisStorage) DeleteConsumer(ctx context.Context, id, group, topic stri
 
 func (r *RedisStorage) UpdateAssignment(ctx context.Context, group, topic string, assignment map[int32]string) error {
 	key := fmt.Sprintf("gmq:state:assign:%s:%s", group, topic)
-	
+
 	// 转换 map 格式
 	fields := make(map[string]interface{})
 	for k, v := range assignment {
 		fields[strconv.Itoa(int(k))] = v
 	}
-	
+
 	return r.client.HMSet(ctx, key, fields).Err()
 }
 

@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/chowyu12/gmq/pkg/client"
+	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto"
 )
 
 func main() {
-	fmt.Println("=== GMQ 消费组示例 ===")
-	fmt.Println("启动多个消费者组成消费组，演示负载均衡...")
+	log.Init("info")
+	log.Info("=== GMQ 消费组示例 ===")
+	log.Info("启动多个消费者组成消费组，演示负载均衡...")
 
 	consumerGroup := "demo-consumer-group"
 	topic := "test-topic"
@@ -36,12 +38,12 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	fmt.Println("\n正在关闭所有消费者...")
+	log.Info("正在关闭所有消费者...")
 }
 
 func startConsumer(id int, consumerGroup, topic string) {
 	consumerID := fmt.Sprintf("consumer-%d", id)
-
+	
 	var messageCount int
 	var mu sync.Mutex
 
@@ -49,25 +51,24 @@ func startConsumer(id int, consumerGroup, topic string) {
 		ServerAddr:    "localhost:50051",
 		ConsumerGroup: consumerGroup,
 		ConsumerID:    consumerID,
-		MessageHandler: func(msg *pb.ConsumeMessage) error {
+		MessageHandler: func(ctx client.MessageContext) error {
+			msg := ctx.Message()
 			mu.Lock()
 			messageCount++
 			count := messageCount
 			mu.Unlock()
 
-			fmt.Printf("[%s] 收到第 %d 条消息 | msgID=%s | partition=%d | 内容=%s\n",
-				consumerID, count, msg.MessageId[:8], msg.PartitionId, string(msg.Payload))
-
-			// 模拟处理时间
-			time.Sleep(200 * time.Millisecond)
-			return nil
+			log.Info("收到消息", "consumer", consumerID, "count", count, "msgID", msg.MessageId[:8], "partition", msg.PartitionId, "payload", string(msg.Payload))
+			
+			// 显式确认消息
+			return ctx.Ack()
 		},
 		ErrorHandler: func(err error) {
-			fmt.Printf("[%s] 错误: %v\n", consumerID, err)
+			log.Error("消费者错误", "consumer", consumerID, "error", err)
 		},
 	})
 	if err != nil {
-		fmt.Printf("创建消费者 %s 失败: %v\n", consumerID, err)
+		log.Error("创建消费者失败", "consumer", consumerID, "error", err)
 		return
 	}
 	defer consumer.Close()
@@ -79,11 +80,11 @@ func startConsumer(id int, consumerGroup, topic string) {
 		client.WithSubscribeQoS(pb.QoS_QOS_AT_MOST_ONCE),
 	)
 	if err != nil {
-		fmt.Printf("[%s] 订阅失败: %v\n", consumerID, err)
+		log.Error("订阅失败", "consumer", consumerID, "error", err)
 		return
 	}
 
-	fmt.Printf("[%s] 已启动，等待消息...\n", consumerID)
+	log.Info("消费者已启动，等待消息...", "consumer", consumerID)
 
 	// 保持运行
 	select {}
