@@ -306,8 +306,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 			s.handleSubscribe(ctx, stream, req)
 
 		case pb.MessageType_MESSAGE_TYPE_ACK_REQUEST:
-			// 异步处理 Ack，不阻塞上行接收循环
-			go s.handleAck(ctx, stream, msg.GetAckReq())
+			s.handleAck(ctx, stream, msg.GetAckReq())
 
 		case pb.MessageType_MESSAGE_TYPE_HEARTBEAT_REQUEST:
 			s.handleHeartbeat(ctx, stream, msg.GetHeartbeatReq())
