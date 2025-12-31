@@ -30,6 +30,7 @@ message StreamMessage {
     HeartbeatRequest heartbeat_req = 9;
     HeartbeatResponse heartbeat_resp = 10;
     ErrorResponse error_resp = 11;
+    PullRequest pull_req = 12;
   }
 }
 
@@ -56,6 +57,8 @@ enum MessageType {
   MESSAGE_TYPE_HEARTBEAT_RESPONSE = 9;
   // 错误响应
   MESSAGE_TYPE_ERROR_RESPONSE = 10;
+  // 客户端主动拉取请求
+  MESSAGE_TYPE_PULL_REQUEST = 11;
 }
 
 // QoS 级别
@@ -232,4 +235,12 @@ message ErrorResponse {
   int32 code = 1;
   // 错误信息
   string message = 2;
+}
+
+// 客户端主动拉取消息请求
+message PullRequest {
+  string consumer_id = 1;
+  string consumer_group = 2;
+  string topic = 3;
+  int32 limit = 4;
 }

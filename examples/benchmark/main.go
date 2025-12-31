@@ -134,21 +134,31 @@ func runConsumerBench() {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			consumer, _ := client.NewConsumer(&client.ConsumerConfig{
-				ServerAddr:     *addr,
-				ConsumerGroup:  "bench-group",
-				ConsumerID:     fmt.Sprintf("bench-cons-%d", id),
-				Topic:          *topic,
-				PullIntervalMs: 10, // 降低拉取间隔至 10ms
+			consumer, err := client.NewConsumer(&client.ConsumerConfig{
+				ServerAddr:    *addr,
+				ConsumerGroup: "bench-group",
+				ConsumerID:    fmt.Sprintf("bench-cons-%d", id),
+				Topic:         *topic,
 			})
+			if err != nil {
+				fmt.Printf("创建消费者失败 [%d]: %v\n", id, err)
+				return
+			}
+			defer consumer.Close()
 
 			for {
-				mctx, err := consumer.Receive(context.Background())
+				mctx, err := consumer.Receive(context.Background(), 5*time.Second)
 				if err != nil {
+					if err == context.DeadlineExceeded {
+						continue // 超时只是没拉到消息，继续下一轮循环
+					}
+					fmt.Printf("消费者错误 [%d]: %v\n", id, err)
 					break
 				}
+				if mctx == nil {
+					continue
+				}
 				atomic.AddInt64(&count, int64(len(mctx.Messages())))
-				// 直接使用便捷的批量 Ack
 				_ = mctx.Ack()
 			}
 		}(i)

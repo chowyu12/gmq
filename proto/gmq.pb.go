@@ -46,6 +46,8 @@ const (
 	MessageType_MESSAGE_TYPE_HEARTBEAT_RESPONSE MessageType = 9
 	// 错误响应
 	MessageType_MESSAGE_TYPE_ERROR_RESPONSE MessageType = 10
+	// 客户端主动拉取请求
+	MessageType_MESSAGE_TYPE_PULL_REQUEST MessageType = 11
 )
 
 // Enum value maps for MessageType.
@@ -62,6 +64,7 @@ var (
 		8:  "MESSAGE_TYPE_HEARTBEAT_REQUEST",
 		9:  "MESSAGE_TYPE_HEARTBEAT_RESPONSE",
 		10: "MESSAGE_TYPE_ERROR_RESPONSE",
+		11: "MESSAGE_TYPE_PULL_REQUEST",
 	}
 	MessageType_value = map[string]int32{
 		"MESSAGE_TYPE_UNSPECIFIED":        0,
@@ -75,6 +78,7 @@ var (
 		"MESSAGE_TYPE_HEARTBEAT_REQUEST":  8,
 		"MESSAGE_TYPE_HEARTBEAT_RESPONSE": 9,
 		"MESSAGE_TYPE_ERROR_RESPONSE":     10,
+		"MESSAGE_TYPE_PULL_REQUEST":       11,
 	}
 )
 
@@ -177,6 +181,7 @@ type StreamMessage struct {
 	//	*StreamMessage_HeartbeatReq
 	//	*StreamMessage_HeartbeatResp
 	//	*StreamMessage_ErrorResp
+	//	*StreamMessage_PullReq
 	Payload       isStreamMessage_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -316,6 +321,15 @@ func (x *StreamMessage) GetErrorResp() *ErrorResponse {
 	return nil
 }
 
+func (x *StreamMessage) GetPullReq() *PullRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*StreamMessage_PullReq); ok {
+			return x.PullReq
+		}
+	}
+	return nil
+}
+
 type isStreamMessage_Payload interface {
 	isStreamMessage_Payload()
 }
@@ -360,6 +374,10 @@ type StreamMessage_ErrorResp struct {
 	ErrorResp *ErrorResponse `protobuf:"bytes,11,opt,name=error_resp,json=errorResp,proto3,oneof"`
 }
 
+type StreamMessage_PullReq struct {
+	PullReq *PullRequest `protobuf:"bytes,12,opt,name=pull_req,json=pullReq,proto3,oneof"`
+}
+
 func (*StreamMessage_PublishReq) isStreamMessage_Payload() {}
 
 func (*StreamMessage_PublishResp) isStreamMessage_Payload() {}
@@ -379,6 +397,8 @@ func (*StreamMessage_HeartbeatReq) isStreamMessage_Payload() {}
 func (*StreamMessage_HeartbeatResp) isStreamMessage_Payload() {}
 
 func (*StreamMessage_ErrorResp) isStreamMessage_Payload() {}
+
+func (*StreamMessage_PullReq) isStreamMessage_Payload() {}
 
 // 发布消息请求 (支持批量)
 type PublishRequest struct {
@@ -1487,11 +1507,80 @@ func (x *ErrorResponse) GetMessage() string {
 	return ""
 }
 
+// 客户端主动拉取消息请求
+type PullRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConsumerId    string                 `protobuf:"bytes,1,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
+	ConsumerGroup string                 `protobuf:"bytes,2,opt,name=consumer_group,json=consumerGroup,proto3" json:"consumer_group,omitempty"`
+	Topic         string                 `protobuf:"bytes,3,opt,name=topic,proto3" json:"topic,omitempty"`
+	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullRequest) Reset() {
+	*x = PullRequest{}
+	mi := &file_proto_gmq_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullRequest) ProtoMessage() {}
+
+func (x *PullRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_gmq_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
+func (*PullRequest) Descriptor() ([]byte, []int) {
+	return file_proto_gmq_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *PullRequest) GetConsumerId() string {
+	if x != nil {
+		return x.ConsumerId
+	}
+	return ""
+}
+
+func (x *PullRequest) GetConsumerGroup() string {
+	if x != nil {
+		return x.ConsumerGroup
+	}
+	return ""
+}
+
+func (x *PullRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *PullRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
 var File_proto_gmq_proto protoreflect.FileDescriptor
 
 const file_proto_gmq_proto_rawDesc = "" +
 	"\n" +
-	"\x0fproto/gmq.proto\x12\x03gmq\"\xf9\x04\n" +
+	"\x0fproto/gmq.proto\x12\x03gmq\"\xa8\x05\n" +
 	"\rStreamMessage\x12$\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x10.gmq.MessageTypeR\x04type\x126\n" +
 	"\vpublish_req\x18\x02 \x01(\v2\x13.gmq.PublishRequestH\x00R\n" +
@@ -1507,7 +1596,8 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x0eheartbeat_resp\x18\n" +
 	" \x01(\v2\x16.gmq.HeartbeatResponseH\x00R\rheartbeatResp\x123\n" +
 	"\n" +
-	"error_resp\x18\v \x01(\v2\x12.gmq.ErrorResponseH\x00R\terrorRespB\t\n" +
+	"error_resp\x18\v \x01(\v2\x12.gmq.ErrorResponseH\x00R\terrorResp\x12-\n" +
+	"\bpull_req\x18\f \x01(\v2\x10.gmq.PullRequestH\x00R\apullReqB\t\n" +
 	"\apayload\"W\n" +
 	"\x0ePublishRequest\x12\x1d\n" +
 	"\n" +
@@ -1612,7 +1702,13 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"=\n" +
 	"\rErrorResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage*\x82\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x81\x01\n" +
+	"\vPullRequest\x12\x1f\n" +
+	"\vconsumer_id\x18\x01 \x01(\tR\n" +
+	"consumerId\x12%\n" +
+	"\x0econsumer_group\x18\x02 \x01(\tR\rconsumerGroup\x12\x14\n" +
+	"\x05topic\x18\x03 \x01(\tR\x05topic\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit*\xa1\x03\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cMESSAGE_TYPE_PUBLISH_REQUEST\x10\x01\x12!\n" +
@@ -1625,7 +1721,8 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x1eMESSAGE_TYPE_HEARTBEAT_REQUEST\x10\b\x12#\n" +
 	"\x1fMESSAGE_TYPE_HEARTBEAT_RESPONSE\x10\t\x12\x1f\n" +
 	"\x1bMESSAGE_TYPE_ERROR_RESPONSE\x10\n" +
-	"*H\n" +
+	"\x12\x1d\n" +
+	"\x19MESSAGE_TYPE_PULL_REQUEST\x10\v*H\n" +
 	"\x03QoS\x12\x14\n" +
 	"\x10QOS_AT_MOST_ONCE\x10\x00\x12\x15\n" +
 	"\x11QOS_AT_LEAST_ONCE\x10\x01\x12\x14\n" +
@@ -1648,7 +1745,7 @@ func file_proto_gmq_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_gmq_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_gmq_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_proto_gmq_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_proto_gmq_proto_goTypes = []any{
 	(MessageType)(0),            // 0: gmq.MessageType
 	(QoS)(0),                    // 1: gmq.QoS
@@ -1669,8 +1766,9 @@ var file_proto_gmq_proto_goTypes = []any{
 	(*HeartbeatRequest)(nil),    // 16: gmq.HeartbeatRequest
 	(*HeartbeatResponse)(nil),   // 17: gmq.HeartbeatResponse
 	(*ErrorResponse)(nil),       // 18: gmq.ErrorResponse
-	nil,                         // 19: gmq.PublishItem.PropertiesEntry
-	nil,                         // 20: gmq.MessageItem.PropertiesEntry
+	(*PullRequest)(nil),         // 19: gmq.PullRequest
+	nil,                         // 20: gmq.PublishItem.PropertiesEntry
+	nil,                         // 21: gmq.MessageItem.PropertiesEntry
 }
 var file_proto_gmq_proto_depIdxs = []int32{
 	0,  // 0: gmq.StreamMessage.type:type_name -> gmq.MessageType
@@ -1684,24 +1782,25 @@ var file_proto_gmq_proto_depIdxs = []int32{
 	16, // 8: gmq.StreamMessage.heartbeat_req:type_name -> gmq.HeartbeatRequest
 	17, // 9: gmq.StreamMessage.heartbeat_resp:type_name -> gmq.HeartbeatResponse
 	18, // 10: gmq.StreamMessage.error_resp:type_name -> gmq.ErrorResponse
-	4,  // 11: gmq.PublishRequest.items:type_name -> gmq.PublishItem
-	19, // 12: gmq.PublishItem.properties:type_name -> gmq.PublishItem.PropertiesEntry
-	1,  // 13: gmq.PublishItem.qos:type_name -> gmq.QoS
-	6,  // 14: gmq.PublishResponse.results:type_name -> gmq.PublishResult
-	1,  // 15: gmq.SubscribeRequest.qos:type_name -> gmq.QoS
-	12, // 16: gmq.ConsumeMessage.items:type_name -> gmq.MessageItem
-	20, // 17: gmq.MessageItem.properties:type_name -> gmq.MessageItem.PropertiesEntry
-	1,  // 18: gmq.MessageItem.qos:type_name -> gmq.QoS
-	14, // 19: gmq.AckRequest.items:type_name -> gmq.AckItem
-	2,  // 20: gmq.GMQService.Stream:input_type -> gmq.StreamMessage
-	8,  // 21: gmq.GMQService.CreateTopic:input_type -> gmq.CreateTopicRequest
-	2,  // 22: gmq.GMQService.Stream:output_type -> gmq.StreamMessage
-	9,  // 23: gmq.GMQService.CreateTopic:output_type -> gmq.CreateTopicResponse
-	22, // [22:24] is the sub-list for method output_type
-	20, // [20:22] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	19, // 11: gmq.StreamMessage.pull_req:type_name -> gmq.PullRequest
+	4,  // 12: gmq.PublishRequest.items:type_name -> gmq.PublishItem
+	20, // 13: gmq.PublishItem.properties:type_name -> gmq.PublishItem.PropertiesEntry
+	1,  // 14: gmq.PublishItem.qos:type_name -> gmq.QoS
+	6,  // 15: gmq.PublishResponse.results:type_name -> gmq.PublishResult
+	1,  // 16: gmq.SubscribeRequest.qos:type_name -> gmq.QoS
+	12, // 17: gmq.ConsumeMessage.items:type_name -> gmq.MessageItem
+	21, // 18: gmq.MessageItem.properties:type_name -> gmq.MessageItem.PropertiesEntry
+	1,  // 19: gmq.MessageItem.qos:type_name -> gmq.QoS
+	14, // 20: gmq.AckRequest.items:type_name -> gmq.AckItem
+	2,  // 21: gmq.GMQService.Stream:input_type -> gmq.StreamMessage
+	8,  // 22: gmq.GMQService.CreateTopic:input_type -> gmq.CreateTopicRequest
+	2,  // 23: gmq.GMQService.Stream:output_type -> gmq.StreamMessage
+	9,  // 24: gmq.GMQService.CreateTopic:output_type -> gmq.CreateTopicResponse
+	23, // [23:25] is the sub-list for method output_type
+	21, // [21:23] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_proto_gmq_proto_init() }
@@ -1720,6 +1819,7 @@ func file_proto_gmq_proto_init() {
 		(*StreamMessage_HeartbeatReq)(nil),
 		(*StreamMessage_HeartbeatResp)(nil),
 		(*StreamMessage_ErrorResp)(nil),
+		(*StreamMessage_PullReq)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1727,7 +1827,7 @@ func file_proto_gmq_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_gmq_proto_rawDesc), len(file_proto_gmq_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

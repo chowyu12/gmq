@@ -67,8 +67,8 @@ func startConsumer(id int, consumerGroup, topic string) {
 	log.Info("消费者已启动，进入接收循环...", "consumerID", consumerID, "topic", topic)
 
 	for {
-		mctx, err := consumer.Receive(context.Background())
-		if err != nil {
+		mctx, err := consumer.Receive(context.Background(), 10*time.Second)
+		if err != nil && err != context.DeadlineExceeded {
 			log.Error("接收消息失败", "consumerID", consumerID, "error", err)
 			break
 		}
