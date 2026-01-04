@@ -103,6 +103,7 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 						Properties:  m.Properties,
 						Timestamp:   m.Timestamp,
 						Qos:         pb.QoS(m.Qos),
+						Key:         m.Key,
 					})
 				}
 			}
@@ -146,15 +147,29 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 	for i, item := range req.Items {
 		msgID := xid.New().String()
 		partID := item.PartitionId
+
+		// 路由逻辑：
+		// 1. 如果指定了 PartitionId (>=0)，直接使用
+		// 2. 否则如果指定了 PartitionKey，根据 Key Hash 路由
+		// 3. 否则，随机分配 (目前简化为随机 ID 取模)
 		if partID < 0 {
-			partID = int32(fnv.New32a().Sum32() % uint32(s.partitions))
+			if item.PartitionKey != "" {
+				h := fnv.New32a()
+				h.Write([]byte(item.PartitionKey))
+				partID = int32(h.Sum32() % uint32(s.partitions))
+			} else {
+				// 随机
+				partID = int32(fnv.New32a().Sum32() % uint32(s.partitions))
+			}
 		}
+
 		storageMsgs[i] = &storagepb.Message{
 			Id:          msgID,
 			Topic:       item.Topic,
 			PartitionId: partID,
 			Payload:     item.Payload,
 			Timestamp:   time.Now().Unix(),
+			Key:         item.PartitionKey,
 		}
 		results[i] = &pb.PublishResult{
 			MessageId:   msgID,

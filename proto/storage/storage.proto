@@ -60,6 +60,8 @@ message Message {
   // 生产端幂等支持
   string producer_id = 9;
   int64 sequence_number = 10;
+  // 分区路由 Key
+  string key = 11;
 }
 
 message WriteMessagesRequest {

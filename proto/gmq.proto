@@ -184,6 +184,8 @@ message MessageItem {
   int64 timestamp = 7;
   // QoS 级别
   QoS qos = 8;
+  // 分区路由 Key
+  string key = 9;
 }
 
 // 消息确认请求 (支持批量确认)

@@ -1055,7 +1055,9 @@ type MessageItem struct {
 	// 时间戳
 	Timestamp int64 `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// QoS 级别
-	Qos           QoS `protobuf:"varint,8,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
+	Qos QoS `protobuf:"varint,8,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
+	// 分区路由 Key
+	Key           string `protobuf:"bytes,9,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1144,6 +1146,13 @@ func (x *MessageItem) GetQos() QoS {
 		return x.Qos
 	}
 	return QoS_QOS_AT_MOST_ONCE
+}
+
+func (x *MessageItem) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
 }
 
 // 消息确认请求 (支持批量确认)
@@ -1659,7 +1668,7 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x13assigned_partitions\x18\x03 \x03(\x05R\x12assignedPartitions\x12#\n" +
 	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"8\n" +
 	"\x0eConsumeMessage\x12&\n" +
-	"\x05items\x18\x01 \x03(\v2\x10.gmq.MessageItemR\x05items\"\xd2\x02\n" +
+	"\x05items\x18\x01 \x03(\v2\x10.gmq.MessageItemR\x05items\"\xe4\x02\n" +
 	"\vMessageItem\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x14\n" +
@@ -1671,7 +1680,8 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"properties\x18\x06 \x03(\v2 .gmq.MessageItem.PropertiesEntryR\n" +
 	"properties\x12\x1c\n" +
 	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x12\x1a\n" +
-	"\x03qos\x18\b \x01(\x0e2\b.gmq.QoSR\x03qos\x1a=\n" +
+	"\x03qos\x18\b \x01(\x0e2\b.gmq.QoSR\x03qos\x12\x10\n" +
+	"\x03key\x18\t \x01(\tR\x03key\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x97\x01\n" +

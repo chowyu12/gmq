@@ -18,6 +18,7 @@ type Message struct {
 	QoS            int32             `json:"qos"`
 	ProducerID     string            `json:"producer_id,omitempty"`
 	SequenceNumber int64             `json:"sequence_number,omitempty"`
+	Key            string            `json:"key,omitempty"`
 }
 
 // Partition 分区结构

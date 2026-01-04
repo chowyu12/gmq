@@ -163,8 +163,10 @@ type Message struct {
 	// 生产端幂等支持
 	ProducerId     string `protobuf:"bytes,9,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
 	SequenceNumber int64  `protobuf:"varint,10,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 分区路由 Key
+	Key           string `protobuf:"bytes,11,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Message) Reset() {
@@ -265,6 +267,13 @@ func (x *Message) GetSequenceNumber() int64 {
 		return x.SequenceNumber
 	}
 	return 0
+}
+
+func (x *Message) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
 }
 
 type WriteMessagesRequest struct {
@@ -1864,7 +1873,7 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\x15FetchMessagesResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12,\n" +
-	"\bmessages\x18\x03 \x03(\v2\x10.storage.MessageR\bmessages\"\xff\x02\n" +
+	"\bmessages\x18\x03 \x03(\v2\x10.storage.MessageR\bmessages\"\x91\x03\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12!\n" +
@@ -1879,7 +1888,8 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\vproducer_id\x18\t \x01(\tR\n" +
 	"producerId\x12'\n" +
 	"\x0fsequence_number\x18\n" +
-	" \x01(\x03R\x0esequenceNumber\x1a=\n" +
+	" \x01(\x03R\x0esequenceNumber\x12\x10\n" +
+	"\x03key\x18\v \x01(\tR\x03key\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"D\n" +
