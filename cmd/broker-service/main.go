@@ -5,6 +5,7 @@ import (
 	"flag"
 	"hash/fnv"
 	"io"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -63,6 +64,7 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 }
 
 func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.PullRequest) {
+	// 1. Get current partition assignment
 	assignResp, err := s.storageClient.GetGroupAssignment(ctx, &storagepb.GetGroupAssignmentRequest{
 		ConsumerGroup: req.ConsumerGroup, Topic: req.Topic,
 	})
@@ -76,7 +78,10 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 			myPartitions = append(myPartitions, partID)
 		}
 	}
+
+	// If no partitions assigned, maybe need a rebalance
 	if len(myPartitions) == 0 {
+		log.WithContext(ctx).Debug("No partitions assigned to consumer", "consumerID", req.ConsumerId)
 		return
 	}
 
@@ -84,7 +89,7 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 	for {
 		var allItems []*pb.MessageItem
 		for _, partID := range myPartitions {
-			// Atomic fetch: get offset, read messages, and update offset in one operation
+			// Atomic fetch from storage
 			resp, err := s.storageClient.FetchMessages(ctx, &storagepb.FetchMessagesRequest{
 				Topic:         req.Topic,
 				PartitionId:   partID,
@@ -131,8 +136,8 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 }
 
 func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.AckRequest) {
-	// In Fetch-and-Update architecture, Ack is used to guarantee At-Least-Once delivery
-	// Currently, this mainly returns a response
+	// Acknowledgement is handled via RAU (Read-and-Update) in FetchMessages for performance.
+	// This ACK can be used for secondary confirmation or moving committed offset in the future.
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_ACK_RESPONSE,
 		Payload: &pb.StreamMessage_AckResp{
@@ -148,18 +153,14 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 		msgID := xid.New().String()
 		partID := item.PartitionId
 
-		// Routing logic:
-		// 1. If PartitionId is specified (>=0), use it directly
-		// 2. Otherwise, if PartitionKey is specified, route based on Key Hash
-		// 3. Otherwise, random assignment (currently simplified to random ID modulo)
 		if partID < 0 {
 			if item.PartitionKey != "" {
 				h := fnv.New32a()
 				h.Write([]byte(item.PartitionKey))
 				partID = int32(h.Sum32() % uint32(s.partitions))
 			} else {
-				// Random assignment
-				partID = int32(fnv.New32a().Sum32() % uint32(s.partitions))
+				// Use true random to distribute load
+				partID = rand.Int31n(s.partitions)
 			}
 		}
 
@@ -196,7 +197,10 @@ func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService
 			LastHeartbeat: time.Now().Unix(),
 		},
 	})
+
+	// Rebalance to assign partitions to active consumers
 	s.rebalance(ctx, req.ConsumerGroup, req.Topic)
+
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_RESPONSE,
 		Payload: &pb.StreamMessage_SubscribeResp{
@@ -229,27 +233,52 @@ func (s *BrokerServer) rebalance(ctx context.Context, group, topic string) {
 	if resp == nil || len(resp.Consumers) == 0 {
 		return
 	}
+
+	// Filter active consumers (heartbeat within last 30 seconds)
+	now := time.Now().Unix()
+	var activeConsumers []*storagepb.ConsumerState
+	for _, c := range resp.Consumers {
+		if now-c.LastHeartbeat < 30 {
+			activeConsumers = append(activeConsumers, c)
+		}
+	}
+
+	if len(activeConsumers) == 0 {
+		return
+	}
+
 	assign := make(map[int32]string)
 	for i := int32(0); i < s.partitions; i++ {
-		assign[i] = resp.Consumers[int(i)%len(resp.Consumers)].ConsumerId
+		// Round-robin assignment among active consumers
+		assign[i] = activeConsumers[int(i)%len(activeConsumers)].ConsumerId
 	}
+
 	s.storageClient.UpdateGroupAssignment(ctx, &storagepb.UpdateGroupAssignmentRequest{
 		ConsumerGroup:       group,
 		Topic:               topic,
 		PartitionAssignment: assign,
 	})
+
+	log.WithContext(ctx).Info("Rebalance completed", "group", group, "topic", topic, "activeConsumers", len(activeConsumers))
 }
 
 func main() {
 	flag.Parse()
 	log.Init(*logLevel)
+
+	rand.Seed(time.Now().UnixNano())
+
 	conn, _ := grpc.Dial(*storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	storage := storagepb.NewStorageServiceClient(conn)
+
 	srv := grpc.NewServer()
 	pb.RegisterGMQServiceServer(srv, NewBrokerServer(storage, int32(*defaultPartitions)))
+
 	l, _ := net.Listen("tcp", *addr)
 	log.Info("Broker started", "addr", *addr)
+
 	go srv.Serve(l)
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	<-c

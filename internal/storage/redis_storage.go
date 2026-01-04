@@ -22,7 +22,6 @@ func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error
 		Addr:     addr,
 		Password: password,
 		DB:       db,
-		// Explicitly specify protocol version to avoid client probing for advanced features
 		Protocol: 3,
 	})
 
@@ -103,6 +102,11 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 		args := &redis.XAddArgs{
 			Stream: key,
 			Values: map[string]interface{}{"data": data},
+			// Automatically prune stream to prevent OOM.
+			// Keep last 1,000,000 messages per partition to support large benchmark runs.
+			// Approx: true makes it much more efficient.
+			MaxLen: 1000000,
+			Approx: true,
 		}
 		results[i] = pipe.XAdd(ctx, args)
 	}
@@ -213,66 +217,57 @@ func (r *RedisStorage) GetOffset(ctx context.Context, group, topic string, parti
 	return strconv.ParseInt(val, 10, 64)
 }
 
-// FetchMessages atomically reads and updates offset
+// FetchMessages atomically reads and updates offset, then reads messages.
+// It uses a distributed lock to prevent concurrent pulls on the same partition,
+// eliminating race conditions and avoiding Lua memory limits.
 func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, partitionID int32, limit int) ([]*Message, error) {
-	// Limit batch size to prevent memory overflow in Lua script
-	// DragonflyDB has memory limits for Lua script execution
-	const maxBatchSize = 100
+	// Limit batch size to prevent excessive memory usage in Go layer
+	const maxBatchSize = 500
 	if limit > maxBatchSize {
 		limit = maxBatchSize
 	}
 	if limit <= 0 {
-		limit = 10 // Default to 10 if invalid
+		limit = 100
 	}
 
-	offsetKey := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
-	streamKey := r.streamKey(topic, partitionID)
-	field := strconv.Itoa(int(partitionID))
+	// 1. Acquire distributed lock for this specific partition pull
+	// This prevents multiple brokers from pulling the same messages simultaneously.
+	lockKey := fmt.Sprintf("gmq:lock:fetch:%s:%s:%d", group, topic, partitionID)
+	// Lock timeout 5s is plenty for a single batch pull
+	ok, err := r.client.SetNX(ctx, lockKey, "1", 5*time.Second).Result()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		// If locked, another broker is currently fetching for this partition.
+		// Return empty to allow the caller to retry or back off.
+		return nil, nil
+	}
+	// Ensure lock is released regardless of success or failure
+	defer r.client.Del(ctx, lockKey)
 
-	// Lua script: atomically get offset, read messages, and update offset
-	// Optimized to return only message IDs and data, minimizing memory usage
-	script := `
-		local offset = redis.call("HGET", KEYS[1], ARGV[1])
-		local start = "-"
-		if offset then
-			-- Decode int64 back to Redis ID string
-			local off = tonumber(offset)
-			local ts = math.floor(off / 1048576) -- 2^20
-			local seq = off % 1048576
-			start = "(" .. tostring(ts) .. "-" .. tostring(seq)
-		end
-		
-		local msgs = redis.call("XRANGE", KEYS[2], start, "+", "COUNT", ARGV[2])
-		if #msgs > 0 then
-			local last_id = msgs[#msgs][1]
-			-- Parse ID and store back to HSET
-			local dash_idx = string.find(last_id, "-")
-			local ts = tonumber(string.sub(last_id, 1, dash_idx - 1))
-			local seq = tonumber(string.sub(last_id, dash_idx + 1))
-			local new_off = ts * 1048576 + seq
-			redis.call("HSET", KEYS[1], ARGV[1], tostring(new_off))
-		end
-		return msgs
-	`
-
-	res, err := r.client.Eval(ctx, script, []string{offsetKey, streamKey}, field, limit).Result()
+	// 2. Get the current offset from storage
+	currentOffset, err := r.GetOffset(ctx, group, topic, partitionID)
 	if err != nil {
 		return nil, err
 	}
 
-	rawMsgs := res.([]interface{})
-	var messages []*Message
-	for _, raw := range rawMsgs {
-		item := raw.([]interface{})
-		id := item[1].([]interface{})
-		var msg Message
-		if data, ok := id[1].(string); ok {
-			json.Unmarshal([]byte(data), &msg)
-			msg.Offset = encodeOffset(item[0].(string))
-			messages = append(messages, &msg)
+	// 3. Read messages starting from currentOffset + 1
+	msgs, err := r.ReadMessages(ctx, topic, partitionID, currentOffset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. If messages were found, update the offset immediately
+	if len(msgs) > 0 {
+		lastOffset := msgs[len(msgs)-1].Offset
+		if err := r.UpdateOffset(ctx, group, topic, partitionID, lastOffset); err != nil {
+			// Log error but still return messages; next pull will retry from old offset (at-least-once)
+			log.WithContext(ctx).Error("Failed to update offset after fetch", "group", group, "topic", topic, "error", err)
 		}
 	}
-	return messages, nil
+
+	return msgs, nil
 }
 
 // --- TTL management ---

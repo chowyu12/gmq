@@ -43,6 +43,7 @@ func runProducerBench() {
 		*concurrency, *total, *batchSize, *msgSize)
 
 	var count int64
+	var claimed int64
 	var errCount int64
 	start := time.Now()
 	var wg sync.WaitGroup
@@ -78,7 +79,8 @@ func runProducerBench() {
 			defer producer.Close()
 
 			for {
-				if atomic.LoadInt64(&count) >= int64(*total) {
+				// Use claimed to precisely control the number of messages sent
+				if atomic.AddInt64(&claimed, int64(*batchSize)) > int64(*total) {
 					return
 				}
 
@@ -94,6 +96,7 @@ func runProducerBench() {
 				_, err := producer.Publish(context.Background(), items)
 				if err != nil {
 					atomic.AddInt64(&errCount, 1)
+					// If failed, we could choose to subtract from count, but for simplicity we skip
 				} else {
 					atomic.AddInt64(&count, int64(*batchSize))
 				}
