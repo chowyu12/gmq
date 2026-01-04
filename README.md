@@ -101,7 +101,6 @@ items := []*pb.PublishItem{
     {
         Topic:       "orders",
         Payload:     []byte("Order#1001"),
-        Qos:         pb.QoS_QOS_AT_LEAST_ONCE,
         PartitionKey: "user_id_123", // Hash-based routing
     },
 }
