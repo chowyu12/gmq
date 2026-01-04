@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # DragonflyDB - 高性能 Redis 兼容存储
   dragonfly:

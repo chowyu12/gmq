@@ -22,7 +22,9 @@ func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error
 		Addr:     addr,
 		Password: password,
 		DB:       db,
-		Protocol: 3,
+		// Force RESP2 protocol because DragonflyDB does not support some RESP3 
+		// maintenance subcommands (like CLIENT MAINT_NOTIFICATIONS) yet.
+		Protocol: 2,
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
