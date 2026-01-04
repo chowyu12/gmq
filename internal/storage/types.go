@@ -15,7 +15,6 @@ type Message struct {
 	Properties     map[string]string `json:"properties"`
 	Timestamp      int64             `json:"timestamp"`
 	ExpiresAt      int64             `json:"expires_at,omitempty"`
-	QoS            int32             `json:"qos"`
 	ProducerID     string            `json:"producer_id,omitempty"`
 	SequenceNumber int64             `json:"sequence_number,omitempty"`
 	Key            string            `json:"key,omitempty"`

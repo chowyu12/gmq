@@ -12,52 +12,51 @@ import (
 
 func main() {
 	log.Init("debug")
-	// 创建生产者客户端
+	// Create producer client
 	producer, err := client.NewProducer(&client.ProducerConfig{
 		ServerAddr: "localhost:50051",
 	})
 	if err != nil {
-		log.Error("创建生产者失败", "error", err)
+		log.Error("Failed to create producer", "error", err)
 		return
 	}
 	defer producer.Close()
 
-	log.Info("=== GMQ 生产者批量发送示例 ===")
+	log.Info("=== GMQ Producer Batch Send Example ===")
 
-	// 1. 批量发布 QoS 0 消息 (同一 Topic)
-	log.Info("1. 批量发布 QoS 0 消息...")
-	var qos0Items []*pb.PublishItem
+	// 1. Batch publish messages (Same Topic)
+	log.Info("1. Batch publishing messages...")
+	var items []*pb.PublishItem
 	for i := 0; i < 10; i++ {
-		qos0Items = append(qos0Items, &pb.PublishItem{
+		items = append(items, &pb.PublishItem{
 			Topic:        "test-topic",
-			Payload:      []byte(fmt.Sprintf("批量 QoS 0 消息 #%d", i)),
-			Qos:          pb.QoS_QOS_AT_MOST_ONCE,
+			Payload:      []byte(fmt.Sprintf("Batch message #%d", i)),
 			PartitionKey: fmt.Sprintf("key-%d", i),
 		})
 	}
-	resp, err := producer.Publish(context.Background(), qos0Items)
+	resp, err := producer.Publish(context.Background(), items)
 	if err != nil {
-		log.Error("批量发布失败", "error", err)
+		log.Error("Batch publish failed", "error", err)
 	} else {
-		log.Info("批量发布成功", "results", len(resp.Results))
+		log.Info("Batch publish success", "results", len(resp.Results))
 	}
 
-	// 2. 跨 Topic 批量发布
-	log.Info("2. 跨 Topic 批量发布消息...")
+	// 2. Cross Topic batch publish
+	log.Info("2. Cross Topic batch publishing...")
 	mixedItems := []*pb.PublishItem{
-		{Topic: "orders", Payload: []byte("订单消息"), Qos: pb.QoS_QOS_AT_LEAST_ONCE},
-		{Topic: "payments", Payload: []byte("支付消息"), Qos: pb.QoS_QOS_AT_LEAST_ONCE},
-		{Topic: "notifications", Payload: []byte("通知消息"), Qos: pb.QoS_QOS_AT_MOST_ONCE},
+		{Topic: "orders", Payload: []byte("Order message")},
+		{Topic: "payments", Payload: []byte("Payment message")},
+		{Topic: "notifications", Payload: []byte("Notification message")},
 	}
 	resp, err = producer.Publish(context.Background(), mixedItems)
 	if err != nil {
-		log.Error("混合批量发布失败", "error", err)
+		log.Error("Mixed batch publish failed", "error", err)
 	} else {
 		for _, res := range resp.Results {
-			log.Info("消息已发布", "topic", res.Topic, "msgID", res.MessageId, "success", res.Success)
+			log.Info("Message published", "topic", res.Topic, "msgID", res.MessageId, "success", res.Success)
 		}
 	}
 
-	log.Info("生产者示例完成！")
+	log.Info("Producer example completed!")
 	time.Sleep(1 * time.Second)
 }

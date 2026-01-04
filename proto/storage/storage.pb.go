@@ -159,12 +159,11 @@ type Message struct {
 	Payload     []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
 	Properties  map[string]string      `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Timestamp   int64                  `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Qos         int32                  `protobuf:"varint,8,opt,name=qos,proto3" json:"qos,omitempty"`
 	// Producer idempotency support
-	ProducerId     string `protobuf:"bytes,9,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
-	SequenceNumber int64  `protobuf:"varint,10,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
+	ProducerId     string `protobuf:"bytes,8,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
+	SequenceNumber int64  `protobuf:"varint,9,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
 	// Partition routing key
-	Key           string `protobuf:"bytes,11,opt,name=key,proto3" json:"key,omitempty"`
+	Key           string `protobuf:"bytes,10,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -244,13 +243,6 @@ func (x *Message) GetProperties() map[string]string {
 func (x *Message) GetTimestamp() int64 {
 	if x != nil {
 		return x.Timestamp
-	}
-	return 0
-}
-
-func (x *Message) GetQos() int32 {
-	if x != nil {
-		return x.Qos
 	}
 	return 0
 }
@@ -1873,7 +1865,7 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\x15FetchMessagesResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12,\n" +
-	"\bmessages\x18\x03 \x03(\v2\x10.storage.MessageR\bmessages\"\x91\x03\n" +
+	"\bmessages\x18\x03 \x03(\v2\x10.storage.MessageR\bmessages\"\xff\x02\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12!\n" +
@@ -1883,13 +1875,12 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\n" +
 	"properties\x18\x06 \x03(\v2 .storage.Message.PropertiesEntryR\n" +
 	"properties\x12\x1c\n" +
-	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x12\x10\n" +
-	"\x03qos\x18\b \x01(\x05R\x03qos\x12\x1f\n" +
-	"\vproducer_id\x18\t \x01(\tR\n" +
+	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x12\x1f\n" +
+	"\vproducer_id\x18\b \x01(\tR\n" +
 	"producerId\x12'\n" +
-	"\x0fsequence_number\x18\n" +
-	" \x01(\x03R\x0esequenceNumber\x12\x10\n" +
-	"\x03key\x18\v \x01(\tR\x03key\x1a=\n" +
+	"\x0fsequence_number\x18\t \x01(\x03R\x0esequenceNumber\x12\x10\n" +
+	"\x03key\x18\n" +
+	" \x01(\tR\x03key\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"D\n" +

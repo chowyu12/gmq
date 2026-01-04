@@ -8,9 +8,6 @@ option go_package = "github.com/chowyu12/gmq/proto;gmq";
 service GMQService {
   // Bidirectional stream: produce and consume messages
   rpc Stream(stream StreamMessage) returns (stream StreamMessage);
-
-  // Management interface: manually create Topic
-  rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
 }
 
 // Stream message wrapper
@@ -61,16 +58,6 @@ enum MessageType {
   MESSAGE_TYPE_PULL_REQUEST = 11;
 }
 
-// QoS level
-enum QoS {
-  // At most once (Fire and Forget)
-  QOS_AT_MOST_ONCE = 0;
-  // At least once (Acknowledged)
-  QOS_AT_LEAST_ONCE = 1;
-  // Exactly once
-  QOS_EXACTLY_ONCE = 2;
-}
-
 // Publish message request (supports batch)
 message PublishRequest {
   // Request ID
@@ -90,11 +77,9 @@ message PublishItem {
   bytes payload = 4;
   // Message properties
   map<string, string> properties = 5;
-  // QoS level
-  QoS qos = 6;
   // Producer idempotency support
-  string producer_id = 7;
-  int64 sequence_number = 8;
+  string producer_id = 6;
+  int64 sequence_number = 7;
 }
 
 // Publish message response (supports batch)
@@ -128,26 +113,6 @@ message SubscribeRequest {
   string consumer_group = 3;
   // Consumer ID
   string consumer_id = 4;
-  // QoS level
-  QoS qos = 5;
-  // List of subscribed partitions (empty means subscribe to all partitions)
-  repeated int32 partitions = 6;
-  // Pull interval (milliseconds), optional
-  int32 pull_interval_ms = 7;
-  // Client identifier, optional
-  string client_id = 8;
-}
-
-// Manually create Topic request
-message CreateTopicRequest {
-  string topic = 1;
-  int32 partitions = 2;
-  int64 ttl_seconds = 3;
-}
-
-message CreateTopicResponse {
-  bool success = 1;
-  string error_message = 2;
 }
 
 // Subscribe response
@@ -156,8 +121,6 @@ message SubscribeResponse {
   string request_id = 1;
   // Whether successful
   bool success = 2;
-  // Assigned partition list
-  repeated int32 assigned_partitions = 3;
   // Error message
   string error_message = 4;
 }
@@ -182,10 +145,8 @@ message MessageItem {
   map<string, string> properties = 6;
   // Timestamp
   int64 timestamp = 7;
-  // QoS level
-  QoS qos = 8;
   // Partition routing key
-  string key = 9;
+  string key = 8;
 }
 
 // Message acknowledgment request (supports batch acknowledgment)

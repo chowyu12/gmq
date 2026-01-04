@@ -14,18 +14,18 @@ import (
 )
 
 var (
-	mode        = flag.String("mode", "prod", "压测模式: prod (生产) 或 cons (消费)")
-	topic       = flag.String("topic", "bench-topic", "压测 Topic")
-	concurrency = flag.Int("c", 20, "并发数 (Goroutines)")
-	total       = flag.Int("n", 100000, "消息总数")
-	batchSize   = flag.Int("b", 50, "每批发送的消息数")
-	msgSize     = flag.Int("s", 512, "消息大小 (Bytes)")
-	addr        = flag.String("addr", "localhost:50051", "Broker 地址")
+	mode        = flag.String("mode", "prod", "Benchmark mode: prod (produce) or cons (consume)")
+	topic       = flag.String("topic", "bench-topic", "Target topic")
+	concurrency = flag.Int("c", 20, "Concurrency (Goroutines)")
+	total       = flag.Int("n", 100000, "Total messages")
+	batchSize   = flag.Int("b", 50, "Batch size")
+	msgSize     = flag.Int("s", 512, "Message size (Bytes)")
+	addr        = flag.String("addr", "localhost:50051", "Broker address")
 )
 
 func main() {
 	flag.Parse()
-	log.Init("warn") // 屏蔽大量日志
+	log.Init("warn") // Mute logs
 
 	if *mode == "prod" {
 		runProducerBench()
@@ -37,9 +37,9 @@ func main() {
 func runProducerBench() {
 	payload := make([]byte, *msgSize)
 
-	fmt.Printf("=== GMQ 生产吞吐量压测 ===\n")
-	fmt.Printf("地址: %s | Topic: %s\n", *addr, *topic)
-	fmt.Printf("并发: %d | 总量: %d | 批大小: %d | 消息大小: %dB\n",
+	fmt.Printf("=== GMQ Producer Throughput Benchmark ===\n")
+	fmt.Printf("Address: %s | Topic: %s\n", *addr, *topic)
+	fmt.Printf("Concurrency: %d | Total: %d | Batch: %d | Size: %dB\n",
 		*concurrency, *total, *batchSize, *msgSize)
 
 	var count int64
@@ -48,7 +48,7 @@ func runProducerBench() {
 	start := time.Now()
 	var wg sync.WaitGroup
 
-	// 启动进度报告协程
+	// Progress reporter
 	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
@@ -57,7 +57,7 @@ func runProducerBench() {
 			pct := float64(current) / float64(*total) * 100
 			elapsed := time.Since(start).Seconds()
 			tps := float64(current) / elapsed
-			fmt.Printf("发送进度: %.2f%% (%d/%d) | 当前速率: %.2f msg/s\n", pct, current, *total, tps)
+			fmt.Printf("Progress: %.2f%% (%d/%d) | Rate: %.2f msg/s\n", pct, current, *total, tps)
 			if current >= int64(*total) {
 				return
 			}
@@ -70,16 +70,14 @@ func runProducerBench() {
 			defer wg.Done()
 			producer, err := client.NewProducer(&client.ProducerConfig{
 				ServerAddr: *addr,
-				ClientID:   fmt.Sprintf("bench-prod-%d", id),
 			})
 			if err != nil {
-				fmt.Printf("创建生产者失败: %v\n", err)
+				fmt.Printf("Failed to create producer: %v\n", err)
 				return
 			}
 			defer producer.Close()
 
 			for {
-				// Use claimed to precisely control the number of messages sent
 				if atomic.AddInt64(&claimed, int64(*batchSize)) > int64(*total) {
 					return
 				}
@@ -89,14 +87,12 @@ func runProducerBench() {
 					items[j] = &pb.PublishItem{
 						Topic:   *topic,
 						Payload: payload,
-						Qos:     pb.QoS_QOS_AT_MOST_ONCE,
 					}
 				}
 
 				_, err := producer.Publish(context.Background(), items)
 				if err != nil {
 					atomic.AddInt64(&errCount, 1)
-					// If failed, we could choose to subtract from count, but for simplicity we skip
 				} else {
 					atomic.AddInt64(&count, int64(*batchSize))
 				}
@@ -109,25 +105,25 @@ func runProducerBench() {
 	actualCount := atomic.LoadInt64(&count)
 	tps := float64(actualCount) / duration.Seconds()
 
-	fmt.Printf("\n[结果] 耗时: %v\n", duration)
-	fmt.Printf("成功发送: %d | 失败次数: %d\n", actualCount, errCount)
-	fmt.Printf("平均吞吐量: %.2f msg/s\n", tps)
-	fmt.Printf("数据带宽: %.2f MB/s\n", (tps*float64(*msgSize))/1024/1024)
+	fmt.Printf("\n[Result] Duration: %v\n", duration)
+	fmt.Printf("Success: %d | Failures: %d\n", actualCount, errCount)
+	fmt.Printf("Avg Throughput: %.2f msg/s\n", tps)
+	fmt.Printf("Bandwidth: %.2f MB/s\n", (tps*float64(*msgSize))/1024/1024)
 }
 
 func runConsumerBench() {
-	fmt.Printf("=== GMQ 消费吞吐量压测 ===\n")
-	fmt.Printf("地址: %s | Topic: %s | 消费组: bench-group\n", *addr, *topic)
+	fmt.Printf("=== GMQ Consumer Throughput Benchmark ===\n")
+	fmt.Printf("Address: %s | Topic: %s | Group: bench-group\n", *addr, *topic)
 
 	var count int64
 	var lastCount int64
 
-	// 启动定时器打印每秒消费速率
+	// Rate reporter
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		for range ticker.C {
 			current := atomic.LoadInt64(&count)
-			fmt.Printf("当前消费速率: %d msg/s | 总接收: %d\n", current-lastCount, current)
+			fmt.Printf("Rate: %d msg/s | Total Received: %d\n", current-lastCount, current)
 			lastCount = current
 		}
 	}()
@@ -144,7 +140,7 @@ func runConsumerBench() {
 				Topic:         *topic,
 			})
 			if err != nil {
-				fmt.Printf("创建消费者失败 [%d]: %v\n", id, err)
+				fmt.Printf("Failed to create consumer [%d]: %v\n", id, err)
 				return
 			}
 			defer consumer.Close()
@@ -153,9 +149,9 @@ func runConsumerBench() {
 				mctx, err := consumer.Receive(context.Background(), 5*time.Second)
 				if err != nil {
 					if err == context.DeadlineExceeded {
-						continue // 超时只是没拉到消息，继续下一轮循环
+						continue 
 					}
-					fmt.Printf("消费者错误 [%d]: %v\n", id, err)
+					fmt.Printf("Consumer error [%d]: %v\n", id, err)
 					break
 				}
 				if mctx == nil {

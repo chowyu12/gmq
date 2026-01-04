@@ -109,59 +109,6 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 	return file_proto_gmq_proto_rawDescGZIP(), []int{0}
 }
 
-// QoS level
-type QoS int32
-
-const (
-	// At most once (Fire and Forget)
-	QoS_QOS_AT_MOST_ONCE QoS = 0
-	// At least once (Acknowledged)
-	QoS_QOS_AT_LEAST_ONCE QoS = 1
-	// Exactly once
-	QoS_QOS_EXACTLY_ONCE QoS = 2
-)
-
-// Enum value maps for QoS.
-var (
-	QoS_name = map[int32]string{
-		0: "QOS_AT_MOST_ONCE",
-		1: "QOS_AT_LEAST_ONCE",
-		2: "QOS_EXACTLY_ONCE",
-	}
-	QoS_value = map[string]int32{
-		"QOS_AT_MOST_ONCE":  0,
-		"QOS_AT_LEAST_ONCE": 1,
-		"QOS_EXACTLY_ONCE":  2,
-	}
-)
-
-func (x QoS) Enum() *QoS {
-	p := new(QoS)
-	*p = x
-	return p
-}
-
-func (x QoS) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (QoS) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_gmq_proto_enumTypes[1].Descriptor()
-}
-
-func (QoS) Type() protoreflect.EnumType {
-	return &file_proto_gmq_proto_enumTypes[1]
-}
-
-func (x QoS) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use QoS.Descriptor instead.
-func (QoS) EnumDescriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{1}
-}
-
 // Stream message wrapper
 type StreamMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -467,11 +414,9 @@ type PublishItem struct {
 	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	// Message properties
 	Properties map[string]string `protobuf:"bytes,5,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// QoS level
-	Qos QoS `protobuf:"varint,6,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
 	// Producer idempotency support
-	ProducerId     string `protobuf:"bytes,7,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
-	SequenceNumber int64  `protobuf:"varint,8,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
+	ProducerId     string `protobuf:"bytes,6,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
+	SequenceNumber int64  `protobuf:"varint,7,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -539,13 +484,6 @@ func (x *PublishItem) GetProperties() map[string]string {
 		return x.Properties
 	}
 	return nil
-}
-
-func (x *PublishItem) GetQos() QoS {
-	if x != nil {
-		return x.Qos
-	}
-	return QoS_QOS_AT_MOST_ONCE
 }
 
 func (x *PublishItem) GetProducerId() string {
@@ -708,15 +646,7 @@ type SubscribeRequest struct {
 	// Consumer group name
 	ConsumerGroup string `protobuf:"bytes,3,opt,name=consumer_group,json=consumerGroup,proto3" json:"consumer_group,omitempty"`
 	// Consumer ID
-	ConsumerId string `protobuf:"bytes,4,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
-	// QoS level
-	Qos QoS `protobuf:"varint,5,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
-	// List of subscribed partitions (empty means subscribe to all partitions)
-	Partitions []int32 `protobuf:"varint,6,rep,packed,name=partitions,proto3" json:"partitions,omitempty"`
-	// Pull interval (milliseconds), optional
-	PullIntervalMs int32 `protobuf:"varint,7,opt,name=pull_interval_ms,json=pullIntervalMs,proto3" json:"pull_interval_ms,omitempty"`
-	// Client identifier, optional
-	ClientId      string `protobuf:"bytes,8,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ConsumerId    string `protobuf:"bytes,4,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -779,147 +709,6 @@ func (x *SubscribeRequest) GetConsumerId() string {
 	return ""
 }
 
-func (x *SubscribeRequest) GetQos() QoS {
-	if x != nil {
-		return x.Qos
-	}
-	return QoS_QOS_AT_MOST_ONCE
-}
-
-func (x *SubscribeRequest) GetPartitions() []int32 {
-	if x != nil {
-		return x.Partitions
-	}
-	return nil
-}
-
-func (x *SubscribeRequest) GetPullIntervalMs() int32 {
-	if x != nil {
-		return x.PullIntervalMs
-	}
-	return 0
-}
-
-func (x *SubscribeRequest) GetClientId() string {
-	if x != nil {
-		return x.ClientId
-	}
-	return ""
-}
-
-// Manually create Topic request
-type CreateTopicRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	Partitions    int32                  `protobuf:"varint,2,opt,name=partitions,proto3" json:"partitions,omitempty"`
-	TtlSeconds    int64                  `protobuf:"varint,3,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreateTopicRequest) Reset() {
-	*x = CreateTopicRequest{}
-	mi := &file_proto_gmq_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateTopicRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateTopicRequest) ProtoMessage() {}
-
-func (x *CreateTopicRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateTopicRequest.ProtoReflect.Descriptor instead.
-func (*CreateTopicRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *CreateTopicRequest) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
-}
-
-func (x *CreateTopicRequest) GetPartitions() int32 {
-	if x != nil {
-		return x.Partitions
-	}
-	return 0
-}
-
-func (x *CreateTopicRequest) GetTtlSeconds() int64 {
-	if x != nil {
-		return x.TtlSeconds
-	}
-	return 0
-}
-
-type CreateTopicResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreateTopicResponse) Reset() {
-	*x = CreateTopicResponse{}
-	mi := &file_proto_gmq_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateTopicResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateTopicResponse) ProtoMessage() {}
-
-func (x *CreateTopicResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateTopicResponse.ProtoReflect.Descriptor instead.
-func (*CreateTopicResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *CreateTopicResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *CreateTopicResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
 // Subscribe response
 type SubscribeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -927,8 +716,6 @@ type SubscribeResponse struct {
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// Whether successful
 	Success bool `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	// Assigned partition list
-	AssignedPartitions []int32 `protobuf:"varint,3,rep,packed,name=assigned_partitions,json=assignedPartitions,proto3" json:"assigned_partitions,omitempty"`
 	// Error message
 	ErrorMessage  string `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -937,7 +724,7 @@ type SubscribeResponse struct {
 
 func (x *SubscribeResponse) Reset() {
 	*x = SubscribeResponse{}
-	mi := &file_proto_gmq_proto_msgTypes[8]
+	mi := &file_proto_gmq_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -949,7 +736,7 @@ func (x *SubscribeResponse) String() string {
 func (*SubscribeResponse) ProtoMessage() {}
 
 func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[8]
+	mi := &file_proto_gmq_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -962,7 +749,7 @@ func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{8}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SubscribeResponse) GetRequestId() string {
@@ -977,13 +764,6 @@ func (x *SubscribeResponse) GetSuccess() bool {
 		return x.Success
 	}
 	return false
-}
-
-func (x *SubscribeResponse) GetAssignedPartitions() []int32 {
-	if x != nil {
-		return x.AssignedPartitions
-	}
-	return nil
 }
 
 func (x *SubscribeResponse) GetErrorMessage() string {
@@ -1003,7 +783,7 @@ type ConsumeMessage struct {
 
 func (x *ConsumeMessage) Reset() {
 	*x = ConsumeMessage{}
-	mi := &file_proto_gmq_proto_msgTypes[9]
+	mi := &file_proto_gmq_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1015,7 +795,7 @@ func (x *ConsumeMessage) String() string {
 func (*ConsumeMessage) ProtoMessage() {}
 
 func (x *ConsumeMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[9]
+	mi := &file_proto_gmq_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1028,7 +808,7 @@ func (x *ConsumeMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumeMessage.ProtoReflect.Descriptor instead.
 func (*ConsumeMessage) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{9}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ConsumeMessage) GetItems() []*MessageItem {
@@ -1054,17 +834,15 @@ type MessageItem struct {
 	Properties map[string]string `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Timestamp
 	Timestamp int64 `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	// QoS level
-	Qos QoS `protobuf:"varint,8,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
 	// Partition routing key
-	Key           string `protobuf:"bytes,9,opt,name=key,proto3" json:"key,omitempty"`
+	Key           string `protobuf:"bytes,8,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MessageItem) Reset() {
 	*x = MessageItem{}
-	mi := &file_proto_gmq_proto_msgTypes[10]
+	mi := &file_proto_gmq_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +854,7 @@ func (x *MessageItem) String() string {
 func (*MessageItem) ProtoMessage() {}
 
 func (x *MessageItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[10]
+	mi := &file_proto_gmq_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +867,7 @@ func (x *MessageItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageItem.ProtoReflect.Descriptor instead.
 func (*MessageItem) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{10}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *MessageItem) GetMessageId() string {
@@ -1141,13 +919,6 @@ func (x *MessageItem) GetTimestamp() int64 {
 	return 0
 }
 
-func (x *MessageItem) GetQos() QoS {
-	if x != nil {
-		return x.Qos
-	}
-	return QoS_QOS_AT_MOST_ONCE
-}
-
 func (x *MessageItem) GetKey() string {
 	if x != nil {
 		return x.Key
@@ -1172,7 +943,7 @@ type AckRequest struct {
 
 func (x *AckRequest) Reset() {
 	*x = AckRequest{}
-	mi := &file_proto_gmq_proto_msgTypes[11]
+	mi := &file_proto_gmq_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1184,7 +955,7 @@ func (x *AckRequest) String() string {
 func (*AckRequest) ProtoMessage() {}
 
 func (x *AckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[11]
+	mi := &file_proto_gmq_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1197,7 +968,7 @@ func (x *AckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckRequest.ProtoReflect.Descriptor instead.
 func (*AckRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{11}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AckRequest) GetRequestId() string {
@@ -1240,7 +1011,7 @@ type AckItem struct {
 
 func (x *AckItem) Reset() {
 	*x = AckItem{}
-	mi := &file_proto_gmq_proto_msgTypes[12]
+	mi := &file_proto_gmq_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1252,7 +1023,7 @@ func (x *AckItem) String() string {
 func (*AckItem) ProtoMessage() {}
 
 func (x *AckItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[12]
+	mi := &file_proto_gmq_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1265,7 +1036,7 @@ func (x *AckItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckItem.ProtoReflect.Descriptor instead.
 func (*AckItem) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{12}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AckItem) GetTopic() string {
@@ -1311,7 +1082,7 @@ type AckResponse struct {
 
 func (x *AckResponse) Reset() {
 	*x = AckResponse{}
-	mi := &file_proto_gmq_proto_msgTypes[13]
+	mi := &file_proto_gmq_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1323,7 +1094,7 @@ func (x *AckResponse) String() string {
 func (*AckResponse) ProtoMessage() {}
 
 func (x *AckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[13]
+	mi := &file_proto_gmq_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1336,7 +1107,7 @@ func (x *AckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckResponse.ProtoReflect.Descriptor instead.
 func (*AckResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{13}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *AckResponse) GetRequestId() string {
@@ -1373,7 +1144,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_proto_gmq_proto_msgTypes[14]
+	mi := &file_proto_gmq_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1385,7 +1156,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[14]
+	mi := &file_proto_gmq_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1398,7 +1169,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{14}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HeartbeatRequest) GetConsumerId() string {
@@ -1426,7 +1197,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_proto_gmq_proto_msgTypes[15]
+	mi := &file_proto_gmq_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1438,7 +1209,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[15]
+	mi := &file_proto_gmq_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1451,7 +1222,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{15}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *HeartbeatResponse) GetSuccess() bool {
@@ -1474,7 +1245,7 @@ type ErrorResponse struct {
 
 func (x *ErrorResponse) Reset() {
 	*x = ErrorResponse{}
-	mi := &file_proto_gmq_proto_msgTypes[16]
+	mi := &file_proto_gmq_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1486,7 +1257,7 @@ func (x *ErrorResponse) String() string {
 func (*ErrorResponse) ProtoMessage() {}
 
 func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[16]
+	mi := &file_proto_gmq_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1499,7 +1270,7 @@ func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorResponse.ProtoReflect.Descriptor instead.
 func (*ErrorResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{16}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ErrorResponse) GetCode() int32 {
@@ -1529,7 +1300,7 @@ type PullRequest struct {
 
 func (x *PullRequest) Reset() {
 	*x = PullRequest{}
-	mi := &file_proto_gmq_proto_msgTypes[17]
+	mi := &file_proto_gmq_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1541,7 +1312,7 @@ func (x *PullRequest) String() string {
 func (*PullRequest) ProtoMessage() {}
 
 func (x *PullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gmq_proto_msgTypes[17]
+	mi := &file_proto_gmq_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1554,7 +1325,7 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gmq_proto_rawDescGZIP(), []int{17}
+	return file_proto_gmq_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PullRequest) GetConsumerId() string {
@@ -1611,7 +1382,7 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x0ePublishRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12&\n" +
-	"\x05items\x18\x02 \x03(\v2\x10.gmq.PublishItemR\x05items\"\xec\x02\n" +
+	"\x05items\x18\x02 \x03(\v2\x10.gmq.PublishItemR\x05items\"\xd0\x02\n" +
 	"\vPublishItem\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12#\n" +
 	"\rpartition_key\x18\x02 \x01(\tR\fpartitionKey\x12!\n" +
@@ -1619,11 +1390,10 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12@\n" +
 	"\n" +
 	"properties\x18\x05 \x03(\v2 .gmq.PublishItem.PropertiesEntryR\n" +
-	"properties\x12\x1a\n" +
-	"\x03qos\x18\x06 \x01(\x0e2\b.gmq.QoSR\x03qos\x12\x1f\n" +
-	"\vproducer_id\x18\a \x01(\tR\n" +
+	"properties\x12\x1f\n" +
+	"\vproducer_id\x18\x06 \x01(\tR\n" +
 	"producerId\x12'\n" +
-	"\x0fsequence_number\x18\b \x01(\x03R\x0esequenceNumber\x1a=\n" +
+	"\x0fsequence_number\x18\a \x01(\x03R\x0esequenceNumber\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"^\n" +
@@ -1637,38 +1407,21 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"message_id\x18\x02 \x01(\tR\tmessageId\x12\x14\n" +
 	"\x05topic\x18\x03 \x01(\tR\x05topic\x12!\n" +
 	"\fpartition_id\x18\x04 \x01(\x05R\vpartitionId\x12#\n" +
-	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\x92\x02\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\x8f\x01\n" +
 	"\x10SubscribeRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12%\n" +
 	"\x0econsumer_group\x18\x03 \x01(\tR\rconsumerGroup\x12\x1f\n" +
 	"\vconsumer_id\x18\x04 \x01(\tR\n" +
-	"consumerId\x12\x1a\n" +
-	"\x03qos\x18\x05 \x01(\x0e2\b.gmq.QoSR\x03qos\x12\x1e\n" +
-	"\n" +
-	"partitions\x18\x06 \x03(\x05R\n" +
-	"partitions\x12(\n" +
-	"\x10pull_interval_ms\x18\a \x01(\x05R\x0epullIntervalMs\x12\x1b\n" +
-	"\tclient_id\x18\b \x01(\tR\bclientId\"k\n" +
-	"\x12CreateTopicRequest\x12\x14\n" +
-	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1e\n" +
-	"\n" +
-	"partitions\x18\x02 \x01(\x05R\n" +
-	"partitions\x12\x1f\n" +
-	"\vttl_seconds\x18\x03 \x01(\x03R\n" +
-	"ttlSeconds\"T\n" +
-	"\x13CreateTopicResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"\xa2\x01\n" +
+	"consumerId\"q\n" +
 	"\x11SubscribeResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x18\n" +
-	"\asuccess\x18\x02 \x01(\bR\asuccess\x12/\n" +
-	"\x13assigned_partitions\x18\x03 \x03(\x05R\x12assignedPartitions\x12#\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"8\n" +
 	"\x0eConsumeMessage\x12&\n" +
-	"\x05items\x18\x01 \x03(\v2\x10.gmq.MessageItemR\x05items\"\xe4\x02\n" +
+	"\x05items\x18\x01 \x03(\v2\x10.gmq.MessageItemR\x05items\"\xc8\x02\n" +
 	"\vMessageItem\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x14\n" +
@@ -1679,9 +1432,8 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\n" +
 	"properties\x18\x06 \x03(\v2 .gmq.MessageItem.PropertiesEntryR\n" +
 	"properties\x12\x1c\n" +
-	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x12\x1a\n" +
-	"\x03qos\x18\b \x01(\x0e2\b.gmq.QoSR\x03qos\x12\x10\n" +
-	"\x03key\x18\t \x01(\tR\x03key\x1a=\n" +
+	"\ttimestamp\x18\a \x01(\x03R\ttimestamp\x12\x10\n" +
+	"\x03key\x18\b \x01(\tR\x03key\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x97\x01\n" +
@@ -1732,15 +1484,10 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x1fMESSAGE_TYPE_HEARTBEAT_RESPONSE\x10\t\x12\x1f\n" +
 	"\x1bMESSAGE_TYPE_ERROR_RESPONSE\x10\n" +
 	"\x12\x1d\n" +
-	"\x19MESSAGE_TYPE_PULL_REQUEST\x10\v*H\n" +
-	"\x03QoS\x12\x14\n" +
-	"\x10QOS_AT_MOST_ONCE\x10\x00\x12\x15\n" +
-	"\x11QOS_AT_LEAST_ONCE\x10\x01\x12\x14\n" +
-	"\x10QOS_EXACTLY_ONCE\x10\x022\x84\x01\n" +
+	"\x19MESSAGE_TYPE_PULL_REQUEST\x10\v2B\n" +
 	"\n" +
 	"GMQService\x124\n" +
-	"\x06Stream\x12\x12.gmq.StreamMessage\x1a\x12.gmq.StreamMessage(\x010\x01\x12@\n" +
-	"\vCreateTopic\x12\x17.gmq.CreateTopicRequest\x1a\x18.gmq.CreateTopicResponseB#Z!github.com/chowyu12/gmq/proto;gmqb\x06proto3"
+	"\x06Stream\x12\x12.gmq.StreamMessage\x1a\x12.gmq.StreamMessage(\x010\x01B#Z!github.com/chowyu12/gmq/proto;gmqb\x06proto3"
 
 var (
 	file_proto_gmq_proto_rawDescOnce sync.Once
@@ -1754,63 +1501,55 @@ func file_proto_gmq_proto_rawDescGZIP() []byte {
 	return file_proto_gmq_proto_rawDescData
 }
 
-var file_proto_gmq_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_gmq_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_proto_gmq_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_gmq_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_proto_gmq_proto_goTypes = []any{
-	(MessageType)(0),            // 0: gmq.MessageType
-	(QoS)(0),                    // 1: gmq.QoS
-	(*StreamMessage)(nil),       // 2: gmq.StreamMessage
-	(*PublishRequest)(nil),      // 3: gmq.PublishRequest
-	(*PublishItem)(nil),         // 4: gmq.PublishItem
-	(*PublishResponse)(nil),     // 5: gmq.PublishResponse
-	(*PublishResult)(nil),       // 6: gmq.PublishResult
-	(*SubscribeRequest)(nil),    // 7: gmq.SubscribeRequest
-	(*CreateTopicRequest)(nil),  // 8: gmq.CreateTopicRequest
-	(*CreateTopicResponse)(nil), // 9: gmq.CreateTopicResponse
-	(*SubscribeResponse)(nil),   // 10: gmq.SubscribeResponse
-	(*ConsumeMessage)(nil),      // 11: gmq.ConsumeMessage
-	(*MessageItem)(nil),         // 12: gmq.MessageItem
-	(*AckRequest)(nil),          // 13: gmq.AckRequest
-	(*AckItem)(nil),             // 14: gmq.AckItem
-	(*AckResponse)(nil),         // 15: gmq.AckResponse
-	(*HeartbeatRequest)(nil),    // 16: gmq.HeartbeatRequest
-	(*HeartbeatResponse)(nil),   // 17: gmq.HeartbeatResponse
-	(*ErrorResponse)(nil),       // 18: gmq.ErrorResponse
-	(*PullRequest)(nil),         // 19: gmq.PullRequest
-	nil,                         // 20: gmq.PublishItem.PropertiesEntry
-	nil,                         // 21: gmq.MessageItem.PropertiesEntry
+	(MessageType)(0),          // 0: gmq.MessageType
+	(*StreamMessage)(nil),     // 1: gmq.StreamMessage
+	(*PublishRequest)(nil),    // 2: gmq.PublishRequest
+	(*PublishItem)(nil),       // 3: gmq.PublishItem
+	(*PublishResponse)(nil),   // 4: gmq.PublishResponse
+	(*PublishResult)(nil),     // 5: gmq.PublishResult
+	(*SubscribeRequest)(nil),  // 6: gmq.SubscribeRequest
+	(*SubscribeResponse)(nil), // 7: gmq.SubscribeResponse
+	(*ConsumeMessage)(nil),    // 8: gmq.ConsumeMessage
+	(*MessageItem)(nil),       // 9: gmq.MessageItem
+	(*AckRequest)(nil),        // 10: gmq.AckRequest
+	(*AckItem)(nil),           // 11: gmq.AckItem
+	(*AckResponse)(nil),       // 12: gmq.AckResponse
+	(*HeartbeatRequest)(nil),  // 13: gmq.HeartbeatRequest
+	(*HeartbeatResponse)(nil), // 14: gmq.HeartbeatResponse
+	(*ErrorResponse)(nil),     // 15: gmq.ErrorResponse
+	(*PullRequest)(nil),       // 16: gmq.PullRequest
+	nil,                       // 17: gmq.PublishItem.PropertiesEntry
+	nil,                       // 18: gmq.MessageItem.PropertiesEntry
 }
 var file_proto_gmq_proto_depIdxs = []int32{
 	0,  // 0: gmq.StreamMessage.type:type_name -> gmq.MessageType
-	3,  // 1: gmq.StreamMessage.publish_req:type_name -> gmq.PublishRequest
-	5,  // 2: gmq.StreamMessage.publish_resp:type_name -> gmq.PublishResponse
-	7,  // 3: gmq.StreamMessage.subscribe_req:type_name -> gmq.SubscribeRequest
-	10, // 4: gmq.StreamMessage.subscribe_resp:type_name -> gmq.SubscribeResponse
-	11, // 5: gmq.StreamMessage.consume_msg:type_name -> gmq.ConsumeMessage
-	13, // 6: gmq.StreamMessage.ack_req:type_name -> gmq.AckRequest
-	15, // 7: gmq.StreamMessage.ack_resp:type_name -> gmq.AckResponse
-	16, // 8: gmq.StreamMessage.heartbeat_req:type_name -> gmq.HeartbeatRequest
-	17, // 9: gmq.StreamMessage.heartbeat_resp:type_name -> gmq.HeartbeatResponse
-	18, // 10: gmq.StreamMessage.error_resp:type_name -> gmq.ErrorResponse
-	19, // 11: gmq.StreamMessage.pull_req:type_name -> gmq.PullRequest
-	4,  // 12: gmq.PublishRequest.items:type_name -> gmq.PublishItem
-	20, // 13: gmq.PublishItem.properties:type_name -> gmq.PublishItem.PropertiesEntry
-	1,  // 14: gmq.PublishItem.qos:type_name -> gmq.QoS
-	6,  // 15: gmq.PublishResponse.results:type_name -> gmq.PublishResult
-	1,  // 16: gmq.SubscribeRequest.qos:type_name -> gmq.QoS
-	12, // 17: gmq.ConsumeMessage.items:type_name -> gmq.MessageItem
-	21, // 18: gmq.MessageItem.properties:type_name -> gmq.MessageItem.PropertiesEntry
-	1,  // 19: gmq.MessageItem.qos:type_name -> gmq.QoS
-	14, // 20: gmq.AckRequest.items:type_name -> gmq.AckItem
-	2,  // 21: gmq.GMQService.Stream:input_type -> gmq.StreamMessage
-	8,  // 22: gmq.GMQService.CreateTopic:input_type -> gmq.CreateTopicRequest
-	2,  // 23: gmq.GMQService.Stream:output_type -> gmq.StreamMessage
-	9,  // 24: gmq.GMQService.CreateTopic:output_type -> gmq.CreateTopicResponse
-	23, // [23:25] is the sub-list for method output_type
-	21, // [21:23] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	2,  // 1: gmq.StreamMessage.publish_req:type_name -> gmq.PublishRequest
+	4,  // 2: gmq.StreamMessage.publish_resp:type_name -> gmq.PublishResponse
+	6,  // 3: gmq.StreamMessage.subscribe_req:type_name -> gmq.SubscribeRequest
+	7,  // 4: gmq.StreamMessage.subscribe_resp:type_name -> gmq.SubscribeResponse
+	8,  // 5: gmq.StreamMessage.consume_msg:type_name -> gmq.ConsumeMessage
+	10, // 6: gmq.StreamMessage.ack_req:type_name -> gmq.AckRequest
+	12, // 7: gmq.StreamMessage.ack_resp:type_name -> gmq.AckResponse
+	13, // 8: gmq.StreamMessage.heartbeat_req:type_name -> gmq.HeartbeatRequest
+	14, // 9: gmq.StreamMessage.heartbeat_resp:type_name -> gmq.HeartbeatResponse
+	15, // 10: gmq.StreamMessage.error_resp:type_name -> gmq.ErrorResponse
+	16, // 11: gmq.StreamMessage.pull_req:type_name -> gmq.PullRequest
+	3,  // 12: gmq.PublishRequest.items:type_name -> gmq.PublishItem
+	17, // 13: gmq.PublishItem.properties:type_name -> gmq.PublishItem.PropertiesEntry
+	5,  // 14: gmq.PublishResponse.results:type_name -> gmq.PublishResult
+	9,  // 15: gmq.ConsumeMessage.items:type_name -> gmq.MessageItem
+	18, // 16: gmq.MessageItem.properties:type_name -> gmq.MessageItem.PropertiesEntry
+	11, // 17: gmq.AckRequest.items:type_name -> gmq.AckItem
+	1,  // 18: gmq.GMQService.Stream:input_type -> gmq.StreamMessage
+	1,  // 19: gmq.GMQService.Stream:output_type -> gmq.StreamMessage
+	19, // [19:20] is the sub-list for method output_type
+	18, // [18:19] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_proto_gmq_proto_init() }
@@ -1836,8 +1575,8 @@ func file_proto_gmq_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_gmq_proto_rawDesc), len(file_proto_gmq_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   20,
+			NumEnums:      1,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -47,7 +47,6 @@ type baseClient struct {
 
 	consumerID    string
 	consumerGroup string
-	clientID      string
 	serverAddr    string
 	isClosed      bool
 }
@@ -213,7 +212,6 @@ type Producer struct {
 type ProducerConfig struct {
 	ServerAddr   string
 	ProducerID   string
-	ClientID     string
 	ErrorHandler ErrorHandler
 }
 
@@ -221,11 +219,6 @@ func NewProducer(cfg *ProducerConfig) (*Producer, error) {
 	bc, err := newBaseClient(cfg.ServerAddr, cfg.ErrorHandler)
 	if err != nil {
 		return nil, err
-	}
-	if cfg.ClientID == "" {
-		bc.clientID = "p-" + xid.New().String()
-	} else {
-		bc.clientID = cfg.ClientID
 	}
 	producerID := cfg.ProducerID
 	if producerID == "" {
@@ -272,15 +265,6 @@ func (p *Producer) Publish(ctx context.Context, items []*pb.PublishItem) (*pb.Pu
 	}
 }
 
-func (p *Producer) CreateTopic(ctx context.Context, topic string, partitions int32, ttlSeconds int64) error {
-	resp, err := p.client.CreateTopic(ctx, &pb.CreateTopicRequest{
-		Topic: topic, Partitions: partitions, TtlSeconds: ttlSeconds,
-	})
-	if err != nil { return err }
-	if !resp.Success { return fmt.Errorf("%s", resp.ErrorMessage) }
-	return nil
-}
-
 type Consumer struct {
 	*baseClient
 	topic      string
@@ -293,7 +277,6 @@ type ConsumerConfig struct {
 	ServerAddr    string
 	ConsumerGroup string
 	ConsumerID    string
-	ClientID      string
 	Topic         string
 	PrefetchCount int
 	PullLimit     int // Maximum number of messages per pull request (default: 100)
@@ -308,9 +291,8 @@ func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	if err != nil { return nil, err }
 	bc.consumerGroup = cfg.ConsumerGroup
 	if cfg.ConsumerID == "" { bc.consumerID = "c-" + xid.New().String() } else { bc.consumerID = cfg.ConsumerID }
-	if cfg.ClientID == "" { bc.clientID = "cli-" + xid.New().String() } else { bc.clientID = cfg.ClientID }
 	if cfg.PrefetchCount <= 0 { cfg.PrefetchCount = 100 }
-	pullLimit := int32(100) // Default to 100 to prevent memory overflow
+	pullLimit := int32(100)
 	if cfg.PullLimit > 0 {
 		pullLimit = int32(cfg.PullLimit)
 	}
@@ -408,7 +390,7 @@ func (c *Consumer) Receive(ctx context.Context, timeout time.Duration) (MessageC
 func (c *Consumer) subscribe(ctx context.Context) error {
 	req := &pb.SubscribeRequest{
 		RequestId: xid.New().String(), Topic: c.topic,
-		ConsumerGroup: c.consumerGroup, ConsumerId: c.consumerID, ClientId: c.clientID,
+		ConsumerGroup: c.consumerGroup, ConsumerId: c.consumerID,
 	}
 	respChan := make(chan *pb.StreamMessage, 1)
 	c.requestMu.Lock()
@@ -464,4 +446,3 @@ type PublishOption func(*pb.PublishItem)
 func WithPartitionKey(key string) PublishOption { return func(req *pb.PublishItem) { req.PartitionKey = key } }
 func WithPartitionID(id int32) PublishOption { return func(req *pb.PublishItem) { req.PartitionId = id } }
 func WithProperties(props map[string]string) PublishOption { return func(req *pb.PublishItem) { req.Properties = props } }
-func WithQoS(qos pb.QoS) PublishOption { return func(req *pb.PublishItem) { req.Qos = qos } }

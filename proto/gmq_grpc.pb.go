@@ -19,8 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GMQService_Stream_FullMethodName      = "/gmq.GMQService/Stream"
-	GMQService_CreateTopic_FullMethodName = "/gmq.GMQService/CreateTopic"
+	GMQService_Stream_FullMethodName = "/gmq.GMQService/Stream"
 )
 
 // GMQServiceClient is the client API for GMQService service.
@@ -31,8 +30,6 @@ const (
 type GMQServiceClient interface {
 	// Bidirectional stream: produce and consume messages
 	Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[StreamMessage, StreamMessage], error)
-	// Management interface: manually create Topic
-	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
 }
 
 type gMQServiceClient struct {
@@ -56,16 +53,6 @@ func (c *gMQServiceClient) Stream(ctx context.Context, opts ...grpc.CallOption) 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GMQService_StreamClient = grpc.BidiStreamingClient[StreamMessage, StreamMessage]
 
-func (c *gMQServiceClient) CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateTopicResponse)
-	err := c.cc.Invoke(ctx, GMQService_CreateTopic_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // GMQServiceServer is the server API for GMQService service.
 // All implementations must embed UnimplementedGMQServiceServer
 // for forward compatibility.
@@ -74,8 +61,6 @@ func (c *gMQServiceClient) CreateTopic(ctx context.Context, in *CreateTopicReque
 type GMQServiceServer interface {
 	// Bidirectional stream: produce and consume messages
 	Stream(grpc.BidiStreamingServer[StreamMessage, StreamMessage]) error
-	// Management interface: manually create Topic
-	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
 	mustEmbedUnimplementedGMQServiceServer()
 }
 
@@ -88,9 +73,6 @@ type UnimplementedGMQServiceServer struct{}
 
 func (UnimplementedGMQServiceServer) Stream(grpc.BidiStreamingServer[StreamMessage, StreamMessage]) error {
 	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
-}
-func (UnimplementedGMQServiceServer) CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateTopic not implemented")
 }
 func (UnimplementedGMQServiceServer) mustEmbedUnimplementedGMQServiceServer() {}
 func (UnimplementedGMQServiceServer) testEmbeddedByValue()                    {}
@@ -120,36 +102,13 @@ func _GMQService_Stream_Handler(srv interface{}, stream grpc.ServerStream) error
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GMQService_StreamServer = grpc.BidiStreamingServer[StreamMessage, StreamMessage]
 
-func _GMQService_CreateTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateTopicRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GMQServiceServer).CreateTopic(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GMQService_CreateTopic_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GMQServiceServer).CreateTopic(ctx, req.(*CreateTopicRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // GMQService_ServiceDesc is the grpc.ServiceDesc for GMQService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var GMQService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "gmq.GMQService",
 	HandlerType: (*GMQServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "CreateTopic",
-			Handler:    _GMQService_CreateTopic_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Stream",

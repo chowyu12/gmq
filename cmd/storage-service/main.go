@@ -46,9 +46,9 @@ func (s *StorageServer) WriteMessages(ctx context.Context, req *pb.WriteMessages
 			Payload:        msg.Payload,
 			Properties:     msg.Properties,
 			Timestamp:      msg.Timestamp,
-			QoS:            msg.Qos,
 			ProducerID:     msg.ProducerId,
 			SequenceNumber: msg.SequenceNumber,
+			Key:            msg.Key,
 		}
 	}
 
@@ -78,9 +78,9 @@ func (s *StorageServer) ReadMessages(ctx context.Context, req *pb.ReadMessagesRe
 			Payload:        msg.Payload,
 			Properties:     msg.Properties,
 			Timestamp:      msg.Timestamp,
-			Qos:            msg.QoS,
 			ProducerId:     msg.ProducerID,
 			SequenceNumber: msg.SequenceNumber,
+			Key:            msg.Key,
 		}
 	}
 
@@ -144,9 +144,9 @@ func (s *StorageServer) FetchMessages(ctx context.Context, req *pb.FetchMessages
 			Payload:        msg.Payload,
 			Properties:     msg.Properties,
 			Timestamp:      msg.Timestamp,
-			Qos:            msg.QoS,
 			ProducerId:     msg.ProducerID,
 			SequenceNumber: msg.SequenceNumber,
+			Key:            msg.Key,
 		}
 	}
 

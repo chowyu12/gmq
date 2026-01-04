@@ -56,12 +56,11 @@ message Message {
   bytes payload = 5;
   map<string, string> properties = 6;
   int64 timestamp = 7;
-  int32 qos = 8;
   // Producer idempotency support
-  string producer_id = 9;
-  int64 sequence_number = 10;
+  string producer_id = 8;
+  int64 sequence_number = 9;
   // Partition routing key
-  string key = 11;
+  string key = 10;
 }
 
 message WriteMessagesRequest {
