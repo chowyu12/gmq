@@ -128,6 +128,31 @@ func (s *StorageServer) GetOffset(ctx context.Context, req *pb.GetOffsetRequest)
 	return &pb.GetOffsetResponse{Offset: offset, Success: true}, nil
 }
 
+func (s *StorageServer) FetchMessages(ctx context.Context, req *pb.FetchMessagesRequest) (*pb.FetchMessagesResponse, error) {
+	messages, err := s.store.FetchMessages(ctx, req.ConsumerGroup, req.Topic, req.PartitionId, int(req.Limit))
+	if err != nil {
+		return &pb.FetchMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
+	}
+
+	pbMessages := make([]*pb.Message, len(messages))
+	for i, msg := range messages {
+		pbMessages[i] = &pb.Message{
+			Id:             msg.ID,
+			Topic:          msg.Topic,
+			PartitionId:    msg.PartitionID,
+			Offset:         msg.Offset,
+			Payload:        msg.Payload,
+			Properties:     msg.Properties,
+			Timestamp:      msg.Timestamp,
+			Qos:            msg.QoS,
+			ProducerId:     msg.ProducerID,
+			SequenceNumber: msg.SequenceNumber,
+		}
+	}
+
+	return &pb.FetchMessagesResponse{Messages: pbMessages, Success: true}, nil
+}
+
 func (s *StorageServer) ListPartitions(ctx context.Context, req *pb.ListPartitionsRequest) (*pb.ListPartitionsResponse, error) {
 	partitions, err := s.store.ListPartitions(ctx, req.Topic)
 	if err != nil {

@@ -32,6 +32,7 @@ const (
 	StorageService_DeleteConsumer_FullMethodName        = "/storage.StorageService/DeleteConsumer"
 	StorageService_UpdateGroupAssignment_FullMethodName = "/storage.StorageService/UpdateGroupAssignment"
 	StorageService_GetGroupAssignment_FullMethodName    = "/storage.StorageService/GetGroupAssignment"
+	StorageService_FetchMessages_FullMethodName         = "/storage.StorageService/FetchMessages"
 )
 
 // StorageServiceClient is the client API for StorageService service.
@@ -59,6 +60,8 @@ type StorageServiceClient interface {
 	UpdateGroupAssignment(ctx context.Context, in *UpdateGroupAssignmentRequest, opts ...grpc.CallOption) (*UpdateGroupAssignmentResponse, error)
 	// 获取消费组分配信息
 	GetGroupAssignment(ctx context.Context, in *GetGroupAssignmentRequest, opts ...grpc.CallOption) (*GetGroupAssignmentResponse, error)
+	// 原子拉取：获取当前进度 -> 读取消息 -> 更新进度 (原子操作)
+	FetchMessages(ctx context.Context, in *FetchMessagesRequest, opts ...grpc.CallOption) (*FetchMessagesResponse, error)
 }
 
 type storageServiceClient struct {
@@ -199,6 +202,16 @@ func (c *storageServiceClient) GetGroupAssignment(ctx context.Context, in *GetGr
 	return out, nil
 }
 
+func (c *storageServiceClient) FetchMessages(ctx context.Context, in *FetchMessagesRequest, opts ...grpc.CallOption) (*FetchMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchMessagesResponse)
+	err := c.cc.Invoke(ctx, StorageService_FetchMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServiceServer is the server API for StorageService service.
 // All implementations must embed UnimplementedStorageServiceServer
 // for forward compatibility.
@@ -224,6 +237,8 @@ type StorageServiceServer interface {
 	UpdateGroupAssignment(context.Context, *UpdateGroupAssignmentRequest) (*UpdateGroupAssignmentResponse, error)
 	// 获取消费组分配信息
 	GetGroupAssignment(context.Context, *GetGroupAssignmentRequest) (*GetGroupAssignmentResponse, error)
+	// 原子拉取：获取当前进度 -> 读取消息 -> 更新进度 (原子操作)
+	FetchMessages(context.Context, *FetchMessagesRequest) (*FetchMessagesResponse, error)
 	mustEmbedUnimplementedStorageServiceServer()
 }
 
@@ -272,6 +287,9 @@ func (UnimplementedStorageServiceServer) UpdateGroupAssignment(context.Context, 
 }
 func (UnimplementedStorageServiceServer) GetGroupAssignment(context.Context, *GetGroupAssignmentRequest) (*GetGroupAssignmentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGroupAssignment not implemented")
+}
+func (UnimplementedStorageServiceServer) FetchMessages(context.Context, *FetchMessagesRequest) (*FetchMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchMessages not implemented")
 }
 func (UnimplementedStorageServiceServer) mustEmbedUnimplementedStorageServiceServer() {}
 func (UnimplementedStorageServiceServer) testEmbeddedByValue()                        {}
@@ -528,6 +546,24 @@ func _StorageService_GetGroupAssignment_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StorageService_FetchMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServiceServer).FetchMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StorageService_FetchMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServiceServer).FetchMessages(ctx, req.(*FetchMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StorageService_ServiceDesc is the grpc.ServiceDesc for StorageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -586,6 +622,10 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGroupAssignment",
 			Handler:    _StorageService_GetGroupAssignment_Handler,
+		},
+		{
+			MethodName: "FetchMessages",
+			Handler:    _StorageService_FetchMessages_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

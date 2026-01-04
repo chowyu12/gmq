@@ -51,6 +51,7 @@ type Storage interface {
 	// --- 偏移量管理 ---
 	UpdateOffset(ctx context.Context, consumerGroup, topic string, partitionID int32, offset int64) error
 	GetOffset(ctx context.Context, consumerGroup, topic string, partitionID int32) (int64, error)
+	FetchMessages(ctx context.Context, consumerGroup, topic string, partitionID int32, limit int) ([]*Message, error)
 	
 	// --- TTL 管理 ---
 	SetTTL(ctx context.Context, topic string, ttl time.Duration) error

@@ -29,6 +29,22 @@ service StorageService {
   rpc UpdateGroupAssignment(UpdateGroupAssignmentRequest) returns (UpdateGroupAssignmentResponse);
   // 获取消费组分配信息
   rpc GetGroupAssignment(GetGroupAssignmentRequest) returns (GetGroupAssignmentResponse);
+
+  // 原子拉取：获取当前进度 -> 读取消息 -> 更新进度 (原子操作)
+  rpc FetchMessages(FetchMessagesRequest) returns (FetchMessagesResponse);
+}
+
+message FetchMessagesRequest {
+  string topic = 1;
+  int32 partition_id = 2;
+  string consumer_group = 3;
+  int32 limit = 4;
+}
+
+message FetchMessagesResponse {
+  bool success = 1;
+  string error_message = 2;
+  repeated Message messages = 3;
 }
 
 // 消息结构

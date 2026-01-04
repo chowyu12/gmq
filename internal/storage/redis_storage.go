@@ -213,6 +213,57 @@ func (r *RedisStorage) GetOffset(ctx context.Context, group, topic string, parti
 	return strconv.ParseInt(val, 10, 64)
 }
 
+// FetchMessages 原子地读取并更新偏移量
+func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, partitionID int32, limit int) ([]*Message, error) {
+	offsetKey := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
+	streamKey := r.streamKey(topic, partitionID)
+	field := strconv.Itoa(int(partitionID))
+
+	// Lua 脚本：原子获取进度、读取、更新进度
+	script := `
+		local offset = redis.call("HGET", KEYS[1], ARGV[1])
+		local start = "-"
+		if offset then
+			-- 将编码后的 int64 还原为 Redis ID 字符串
+			local off = tonumber(offset)
+			local ts = math.floor(off / 1048576) -- 2^20
+			local seq = off % 1048576
+			start = "(" .. tostring(ts) .. "-" .. tostring(seq)
+		end
+		
+		local msgs = redis.call("XRANGE", KEYS[2], start, "+", "COUNT", ARGV[2])
+		if #msgs > 0 then
+			local last_id = msgs[#msgs][1]
+			-- 解析 ID 存回 HSET
+			local dash_idx = string.find(last_id, "-")
+			local ts = tonumber(string.sub(last_id, 1, dash_idx - 1))
+			local seq = tonumber(string.sub(last_id, dash_idx + 1))
+			local new_off = ts * 1048576 + seq
+			redis.call("HSET", KEYS[1], ARGV[1], tostring(new_off))
+		end
+		return msgs
+	`
+
+	res, err := r.client.Eval(ctx, script, []string{offsetKey, streamKey}, field, limit).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	rawMsgs := res.([]interface{})
+	var messages []*Message
+	for _, raw := range rawMsgs {
+		item := raw.([]interface{})
+		id := item[1].([]interface{})
+		var msg Message
+		if data, ok := id[1].(string); ok {
+			json.Unmarshal([]byte(data), &msg)
+			msg.Offset = encodeOffset(item[0].(string))
+			messages = append(messages, &msg)
+		}
+	}
+	return messages, nil
+}
+
 // --- TTL 管理 ---
 
 func (r *RedisStorage) SetTTL(ctx context.Context, topic string, ttl time.Duration) error {
