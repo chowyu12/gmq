@@ -12,7 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisStorage 基于 Redis/DragonflyDB 的存储实现
+// RedisStorage implements storage using Redis/DragonflyDB
 type RedisStorage struct {
 	client *redis.Client
 }
@@ -22,7 +22,7 @@ func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error
 		Addr:     addr,
 		Password: password,
 		DB:       db,
-		// 显式指定协议版本，避免客户端尝试探测高级特性
+		// Explicitly specify protocol version to avoid client probing for advanced features
 		Protocol: 3,
 	})
 
@@ -30,19 +30,19 @@ func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("连接 DragonflyDB 失败: %w", err)
+		return nil, fmt.Errorf("failed to connect to DragonflyDB: %w", err)
 	}
 
 	return &RedisStorage{client: client}, nil
 }
 
-// --- 消息操作 (使用 Redis Streams) ---
+// --- Message operations (using Redis Streams) ---
 
 func (r *RedisStorage) streamKey(topic string, partitionID int32) string {
 	return fmt.Sprintf("gmq:stream:%s:%d", topic, partitionID)
 }
 
-// 辅助函数：将 Redis ID 字符串 (timestamp-seq) 编码为 int64
+// Helper function: encode Redis ID string (timestamp-seq) to int64
 func encodeOffset(id string) int64 {
 	parts := strings.Split(id, "-")
 	if len(parts) != 2 {
@@ -50,12 +50,12 @@ func encodeOffset(id string) int64 {
 	}
 	ts, _ := strconv.ParseInt(parts[0], 10, 64)
 	seq, _ := strconv.ParseInt(parts[1], 10, 64)
-	// 高 44 位毫秒级时间戳，低 20 位序列号
-	// 这样可以确保 offset 是单调递增且不丢失 Redis ID 信息的
+	// High 44 bits: millisecond timestamp, low 20 bits: sequence number
+	// This ensures offset is monotonically increasing and preserves Redis ID information
 	return (ts << 20) | (seq & 0xFFFFF)
 }
 
-// 辅助函数：将 int64 编码的 Offset 还原为 Redis ID 字符串
+// Helper function: decode int64 offset back to Redis ID string
 func decodeOffset(offset int64) string {
 	if offset <= 0 {
 		return "-"
@@ -70,8 +70,8 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 		return nil, nil
 	}
 
-	// 1. 获取所有 Topic 的 TTL 配置 (批量获取优化)
-	// 这里的获取逻辑可以进一步优化，目前先简单循环或缓存
+	// 1. Get TTL configuration for all topics (batch optimization)
+	// This logic can be further optimized, currently using simple loop or cache
 	topicTTLs := make(map[string]float64)
 	for _, msg := range msgs {
 		if _, ok := topicTTLs[msg.Topic]; !ok {
@@ -81,16 +81,16 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 		}
 	}
 
-	// 2. 准备 Pipeline
+	// 2. Prepare Pipeline
 	pipe := r.client.Pipeline()
 	results := make([]*redis.StringCmd, len(msgs))
 
 	for i, msg := range msgs {
-		// 幂等性检查 (批量操作中 SetNX 比较复杂，这里仍然按条处理)
+		// Idempotency check (SetNX in batch operations is complex, still processing per message)
 		if msg.ProducerID != "" && msg.SequenceNumber > 0 {
 			dedupKey := fmt.Sprintf("gmq:dedup:%s:%s:%d", msg.Topic, msg.ProducerID, msg.SequenceNumber)
-			// 注意：Pipeline 中的 SetNX 无法立即判断结果来跳过后续步骤
-			// 严格实现需要 Lua 脚本或两阶段提交，这里简化处理，假设 Pipeline 中都是新消息
+			// Note: SetNX in Pipeline cannot immediately determine result to skip subsequent steps
+			// Strict implementation requires Lua script or two-phase commit, simplified here assuming all messages in Pipeline are new
 			pipe.SetNX(ctx, dedupKey, "1", 1*time.Hour)
 		}
 
@@ -107,18 +107,18 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 		results[i] = pipe.XAdd(ctx, args)
 	}
 
-	// 执行 Pipeline
+	// Execute Pipeline
 	_, err := pipe.Exec(ctx)
 	if err != nil && err != redis.Nil {
 		return nil, err
 	}
 
-	// 3. 解析结果
+	// 3. Parse results
 	offsets := make([]int64, len(msgs))
 	for i, resCmd := range results {
 		res, err := resCmd.Result()
 		if err != nil {
-			log.WithContext(ctx).Error("批量写入消息项失败", "index", i, "error", err)
+			log.WithContext(ctx).Error("Failed to write message item in batch", "index", i, "error", err)
 			continue
 		}
 		offsets[i] = encodeOffset(res)
@@ -130,12 +130,12 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error) {
 	key := r.streamKey(topic, partitionID)
 
-	// Redis Stream ID 格式是 "timestamp-sequence"
-	// 如果 offset == 0，我们从最小的 ID 开始读 "-"
-	// 如果 offset > 0，我们需要从该 ID 之后读取，所以用 "(" + ID 语法
+	// Redis Stream ID format is "timestamp-sequence"
+	// If offset == 0, we start reading from the smallest ID "-"
+	// If offset > 0, we need to read after that ID, so use "(" + ID syntax
 	startID := decodeOffset(offset)
 	if offset > 0 {
-		startID = "(" + startID // 排除当前 offset，读取下一条
+		startID = "(" + startID // Exclude current offset, read next message
 	}
 
 	res, err := r.client.XRangeN(ctx, key, startID, "+", int64(limit)).Result()
@@ -148,7 +148,7 @@ func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partition
 		var msg Message
 		if data, ok := xmsg.Values["data"].(string); ok {
 			json.Unmarshal([]byte(data), &msg)
-			// 使用编码后的完整 ID 作为 Offset 返回给客户端
+			// Use encoded full ID as Offset returned to client
 			msg.Offset = encodeOffset(xmsg.ID)
 			messages = append(messages, &msg)
 		}
@@ -157,7 +157,7 @@ func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partition
 }
 
 func (r *RedisStorage) CreatePartition(ctx context.Context, topic string, partitionID int32) error {
-	// Redis Stream 在第一次 XADD 时自动创建，这里可以做一些元数据记录
+	// Redis Stream is automatically created on first XADD, here we can do some metadata recording
 	key := fmt.Sprintf("gmq:meta:partitions:%s", topic)
 	return r.client.SAdd(ctx, key, partitionID).Err()
 }
@@ -194,7 +194,7 @@ func (r *RedisStorage) GetPartition(ctx context.Context, topic string, partition
 	}, nil
 }
 
-// --- 偏移量管理 ---
+// --- Offset management ---
 
 func (r *RedisStorage) UpdateOffset(ctx context.Context, group, topic string, partitionID int32, offset int64) error {
 	key := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
@@ -213,18 +213,29 @@ func (r *RedisStorage) GetOffset(ctx context.Context, group, topic string, parti
 	return strconv.ParseInt(val, 10, 64)
 }
 
-// FetchMessages 原子地读取并更新偏移量
+// FetchMessages atomically reads and updates offset
 func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, partitionID int32, limit int) ([]*Message, error) {
+	// Limit batch size to prevent memory overflow in Lua script
+	// DragonflyDB has memory limits for Lua script execution
+	const maxBatchSize = 100
+	if limit > maxBatchSize {
+		limit = maxBatchSize
+	}
+	if limit <= 0 {
+		limit = 10 // Default to 10 if invalid
+	}
+
 	offsetKey := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
 	streamKey := r.streamKey(topic, partitionID)
 	field := strconv.Itoa(int(partitionID))
 
-	// Lua 脚本：原子获取进度、读取、更新进度
+	// Lua script: atomically get offset, read messages, and update offset
+	// Optimized to return only message IDs and data, minimizing memory usage
 	script := `
 		local offset = redis.call("HGET", KEYS[1], ARGV[1])
 		local start = "-"
 		if offset then
-			-- 将编码后的 int64 还原为 Redis ID 字符串
+			-- Decode int64 back to Redis ID string
 			local off = tonumber(offset)
 			local ts = math.floor(off / 1048576) -- 2^20
 			local seq = off % 1048576
@@ -234,7 +245,7 @@ func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, p
 		local msgs = redis.call("XRANGE", KEYS[2], start, "+", "COUNT", ARGV[2])
 		if #msgs > 0 then
 			local last_id = msgs[#msgs][1]
-			-- 解析 ID 存回 HSET
+			-- Parse ID and store back to HSET
 			local dash_idx = string.find(last_id, "-")
 			local ts = tonumber(string.sub(last_id, 1, dash_idx - 1))
 			local seq = tonumber(string.sub(last_id, dash_idx + 1))
@@ -264,16 +275,16 @@ func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, p
 	return messages, nil
 }
 
-// --- TTL 管理 ---
+// --- TTL management ---
 
 func (r *RedisStorage) SetTTL(ctx context.Context, topic string, ttl time.Duration) error {
-	// Redis Stream 的过期通常通过 XADD 的 MAXLEN 实现，或者设置 Key 的 EXPIRE
-	// 这里记录元数据，实际清理可以在写入时通过 MAXLEN 自动完成
+	// Redis Stream expiration is usually implemented via XADD MAXLEN or setting Key EXPIRE
+	// Here we record metadata, actual cleanup can be done automatically via MAXLEN during writes
 	key := fmt.Sprintf("gmq:meta:ttl:%s", topic)
 	return r.client.Set(ctx, key, ttl.Seconds(), 0).Err()
 }
 
-// --- 状态管理 ---
+// --- State management ---
 
 func (r *RedisStorage) SaveConsumer(ctx context.Context, state *ConsumerState) error {
 	key := fmt.Sprintf("gmq:state:consumers:%s:%s", state.ConsumerGroup, state.Topic)
@@ -305,7 +316,7 @@ func (r *RedisStorage) DeleteConsumer(ctx context.Context, id, group, topic stri
 func (r *RedisStorage) UpdateAssignment(ctx context.Context, group, topic string, assignment map[int32]string) error {
 	key := fmt.Sprintf("gmq:state:assign:%s:%s", group, topic)
 
-	// 转换 map 格式
+	// Convert map format
 	fields := make(map[string]interface{})
 	for k, v := range assignment {
 		fields[strconv.Itoa(int(k))] = v

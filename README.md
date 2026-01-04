@@ -1,21 +1,21 @@
 # GMQ (Go Message Queue)
 
-GMQ 是一个高性能、生产级的分布式消息队列系统，基于 gRPC 双向 Stream 协议实现。它采用存储与分发分离的架构，支持 Topic、Partition、消费组负载均衡以及 QoS 0/1 消息质量保证。
+GMQ is a high-performance, production-grade distributed message queue system based on gRPC bidirectional Stream protocol. It adopts a storage and distribution separation architecture, supporting Topic, Partition, consumer group load balancing, and QoS 0/1 message quality guarantees.
 
-## 🚀 核心特性
+## 🚀 Core Features
 
-- **高性能通信**: 基于 gRPC Bidirectional Stream，维持客户端与 Broker 间的长连接。
-- **现代化架构**:
-  - **Broker Service**: 集成连接网关与分发逻辑，完全无状态，支持无限水平扩展。
-  - **Storage Service**: 独立存储层，支持消息持久化与状态（消费者/消费组）的强一致性管理。
-- **强一致性状态**: 存储层内置 SQLite (纯 Go 实现)，利用数据库事务保证消费组元数据的完整性。
-- **灵活的路由**: 支持 Partition Key (Hash)、指定 Partition ID 以及随机分配。
-- **自动管理**: 支持 Topic 自动创建（默认 3 分区），也支持手动接口创建。
-- **参数化连接**: 客户端可自定义 ClientID 和消息拉取间隔 (Pull Interval)。
-- **可靠性保证**: 支持 QoS 1 (至少一次) 确认机制，消费进度持久化存储。
-- **容器化支持**: 预置 Docker Compose 部署配置。
+- **High-Performance Communication**: Based on gRPC Bidirectional Stream, maintaining long connections between clients and Broker.
+- **Modern Architecture**:
+  - **Broker Service**: Integrates connection gateway and distribution logic, completely stateless, supports unlimited horizontal scaling.
+  - **Storage Service**: Independent storage layer, supports message persistence and strong consistency management of state (consumers/consumer groups).
+- **Strong Consistency State**: Storage layer uses Redis/DragonflyDB with atomic operations (Lua scripts) to ensure consumer group metadata integrity.
+- **Flexible Routing**: Supports Partition Key (Hash), specified Partition ID, and random assignment.
+- **Automatic Management**: Supports automatic Topic creation (default 4 partitions), also supports manual interface creation.
+- **Parameterized Connections**: Clients can customize ClientID and message pull interval.
+- **Reliability Guarantees**: Supports QoS 1 (At-Least-Once) acknowledgment mechanism, consumption progress persisted in storage.
+- **Containerization Support**: Pre-configured Docker Compose deployment configuration.
 
-## 🏗️ 系统架构
+## 🏗️ System Architecture
 
 ```
 ┌─────────────────┐      ┌──────────────────────────────────┐
@@ -37,94 +37,113 @@ GMQ 是一个高性能、生产级的分布式消息队列系统，基于 gRPC �
 ┌───────────────────────────────────────────────────────────┐
 │                 Storage Service (Stateful)                │
 ├───────────────────────────────────────────────────────────┤
-│  - Message Logs (File System)                             │
-│  - Consumer/Group States (SQLite Persistent)              │
+│  - Message Logs (Redis Streams)                          │
+│  - Consumer/Group States (Redis Hash)                    │
+│  - Atomic Fetch (Lua Scripts)                           │
 └───────────────────────────────────────────────────────────┘
 ```
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```
 gmq/
 ├── cmd/
-│   ├── broker-service/       # 接入与分发服务 (无状态)
-│   └── storage-service/      # 存储服务 (有状态)
+│   ├── broker-service/       # Gateway and distribution service (stateless)
+│   └── storage-service/      # Storage service (stateful)
 ├── internal/
-│   ├── storage/              # 存储引擎与 SQLite 状态管理
-│   └── config/               # 配置加载
-├── pkg/client/               # 客户端 SDK
-├── proto/                    # gRPC 协议定义 (Broker/Storage)
-├── examples/                 # 生产者、消费者、消费组示例
-├── docker-compose.yml        # 一键部署编排
-└── Makefile                  # 自动化构建工具
+│   └── storage/              # Storage engine with Redis/DragonflyDB
+├── pkg/
+│   ├── client/               # Client SDK
+│   └── log/                  # Logging utilities
+├── proto/                    # gRPC protocol definitions (Broker/Storage)
+├── examples/                 # Producer, consumer, consumer group examples
+├── docker-compose.yml        # One-click deployment orchestration
+└── Makefile                  # Automated build tools
 ```
 
-## 🛠️ 快速开始
+## 🛠️ Quick Start
 
-### 方式 1：Docker Compose 部署 (推荐)
+### Method 1: Docker Compose Deployment (Recommended)
 
 ```bash
-# 启动所有服务 (1 Storage + 2 Broker)
+# Start all services (1 Storage + 2 Broker)
 make docker
 
-# 查看日志
+# View logs
 make docker-logs
 ```
 
-### 方式 2：本地手动编译启动
+### Method 2: Local Manual Compilation and Startup
 
 ```bash
-# 1. 构建二进制文件
-make build-dist
+# 1. Build binaries
+make build
 
-# 2. 启动存储服务
-make run-storage
+# 2. Start storage service
+./bin/gmq-storage-service -redis-addr localhost:6379
 
-# 3. 启动 Broker 服务
-make run-broker
+# 3. Start broker service
+./bin/gmq-broker-service -storage localhost:50052
 ```
 
-## 💻 客户端使用示例
+## 💻 Client Usage Examples
 
-### 生产者 (Producer)
+### Producer
 
 ```go
-client, _ := client.NewClient(&client.ClientConfig{
-    ServerAddr: "localhost:50051", // 连接 Broker 端口
+producer, _ := client.NewProducer(&client.ProducerConfig{
+    ServerAddr: "localhost:50051", // Connect to Broker port
 })
-defer client.Close()
+defer producer.Close()
 
-// 发送一条 QoS 1 消息
-resp, _ := client.Publish(ctx, "orders", []byte("Order#1001"), 
-    client.WithQoS(pb.QoS_QOS_AT_LEAST_ONCE),
-    client.WithPartitionKey("user_id_123"))
+// Send a QoS 1 message with partition key
+items := []*pb.PublishItem{
+    {
+        Topic:       "orders",
+        Payload:     []byte("Order#1001"),
+        Qos:         pb.QoS_QOS_AT_LEAST_ONCE,
+        PartitionKey: "user_id_123", // Hash-based routing
+    },
+}
+resp, _ := producer.Publish(ctx, items)
 ```
 
-### 消费者 (Consumer)
+### Consumer
 
 ```go
-consumer, _ := client.NewClient(&client.ClientConfig{
+consumer, _ := client.NewConsumer(&client.ConsumerConfig{
     ServerAddr:    "localhost:50051",
     ConsumerGroup: "order-processors",
-    MessageHandler: func(msg *pb.ConsumeMessage) error {
-        fmt.Printf("收到订单: %s\n", string(msg.Payload))
-        return nil
-    },
+    Topic:         "orders",
 })
-consumer.Subscribe(ctx, "orders")
+defer consumer.Close()
+
+for {
+    msgCtx, err := consumer.Receive(ctx, 5*time.Second)
+    if err != nil {
+        continue
+    }
+    for _, msg := range msgCtx.Messages() {
+        fmt.Printf("Received order: %s\n", string(msg.Payload))
+    }
+    msgCtx.Ack()
+}
 ```
 
-## 📊 运维命令
+## 📊 Operations Commands
 
-| 命令 | 说明 |
-|-----|------|
-| `make docker-scale` | 扩展 Broker 实例至 3 个 |
-| `make docker-ps` | 查看容器运行状态与健康检查 |
-| `make clean` | 清理构建产物与存储数据 |
-| `make proto-dist` | 重新生成 gRPC 协议代码 |
+| Command | Description |
+|---------|-------------|
+| `make build` | Build all binaries |
+| `make docker` | Start services with Docker Compose |
+| `make docker-logs` | View container logs |
+| `make clean` | Clean build artifacts and storage data |
+| `make proto` | Regenerate gRPC protocol code |
 
-## 📜 架构演进说明
-关于本项目从单机到分布式 Broker 合并的详细演进历程，请参考 [ARCHITECTURE-EVOLUTION.md](ARCHITECTURE-EVOLUTION.md)。
+## 📜 Architecture Evolution
+
+For detailed evolution history of this project from single-machine to distributed Broker merge, please refer to [ARCHITECTURE-EVOLUTION.md](ARCHITECTURE-EVOLUTION.md).
 
 ---
+
 **License**: MIT | **Go Version**: 1.24+

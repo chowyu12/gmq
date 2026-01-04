@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Message 消息结构（内部使用）
+// Message structure (internal use)
 type Message struct {
 	ID             string            `json:"id"`
 	Topic          string            `json:"topic"`
@@ -21,7 +21,7 @@ type Message struct {
 	Key            string            `json:"key,omitempty"`
 }
 
-// Partition 分区结构
+// Partition structure
 type Partition struct {
 	ID            int32     `json:"id"`
 	Topic         string    `json:"topic"`
@@ -31,7 +31,7 @@ type Partition struct {
 	LastWriteTime time.Time `json:"last_write_time"`
 }
 
-// ConsumerState 消费者状态
+// ConsumerState represents consumer state
 type ConsumerState struct {
 	ConsumerId         string  `json:"id"`
 	ConsumerGroup      string  `json:"consumer_group"`
@@ -40,24 +40,24 @@ type ConsumerState struct {
 	LastHeartbeat      int64   `json:"last_heartbeat"`
 }
 
-// Storage 统一存储接口
+// Storage unified storage interface
 type Storage interface {
-	// --- 消息操作 ---
+	// --- Message operations ---
 	WriteMessages(ctx context.Context, msgs []*Message) ([]int64, error)
 	ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error)
 	CreatePartition(ctx context.Context, topic string, partitionID int32) error
 	GetPartition(ctx context.Context, topic string, partitionID int32) (*Partition, error)
 	ListPartitions(ctx context.Context, topic string) ([]*Partition, error)
 	
-	// --- 偏移量管理 ---
+	// --- Offset management ---
 	UpdateOffset(ctx context.Context, consumerGroup, topic string, partitionID int32, offset int64) error
 	GetOffset(ctx context.Context, consumerGroup, topic string, partitionID int32) (int64, error)
 	FetchMessages(ctx context.Context, consumerGroup, topic string, partitionID int32, limit int) ([]*Message, error)
 	
-	// --- TTL 管理 ---
+	// --- TTL management ---
 	SetTTL(ctx context.Context, topic string, ttl time.Duration) error
 	
-	// --- 状态管理 ---
+	// --- State management ---
 	SaveConsumer(ctx context.Context, state *ConsumerState) error
 	GetConsumers(ctx context.Context, group, topic string) ([]*ConsumerState, error)
 	DeleteConsumer(ctx context.Context, id, group, topic string) error

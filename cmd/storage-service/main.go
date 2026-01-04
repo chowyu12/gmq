@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	addr      = flag.String("addr", ":50052", "Storage 服务监听地址")
-	redisAddr = flag.String("redis-addr", "localhost:6379", "Redis/DragonflyDB 地址")
-	redisPass = flag.String("redis-pass", "", "Redis 密码")
-	logLevel  = flag.String("log-level", "info", "日志级别: debug, info, warn, error")
+	addr      = flag.String("addr", ":50052", "Storage service listen address")
+	redisAddr = flag.String("redis-addr", "localhost:6379", "Redis/DragonflyDB address")
+	redisPass = flag.String("redis-pass", "", "Redis password")
+	logLevel  = flag.String("log-level", "info", "Log level: debug, info, warn, error")
 )
 
-// StorageServer 存储服务实现
+// StorageServer implements the storage service
 type StorageServer struct {
 	pb.UnimplementedStorageServiceServer
 	store storage.Storage
@@ -34,7 +34,7 @@ func NewStorageServer(store storage.Storage) *StorageServer {
 	}
 }
 
-// --- 消息接口实现 ---
+// --- Message interface implementation ---
 
 func (s *StorageServer) WriteMessages(ctx context.Context, req *pb.WriteMessagesRequest) (*pb.WriteMessagesResponse, error) {
 	internalMsgs := make([]*storage.Message, len(req.Messages))
@@ -54,7 +54,7 @@ func (s *StorageServer) WriteMessages(ctx context.Context, req *pb.WriteMessages
 
 	offsets, err := s.store.WriteMessages(ctx, internalMsgs)
 	if err != nil {
-		log.WithContext(ctx).Error("批量写入消息失败", "error", err)
+		log.WithContext(ctx).Error("Failed to write messages in batch", "error", err)
 		return &pb.WriteMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
 
@@ -64,7 +64,7 @@ func (s *StorageServer) WriteMessages(ctx context.Context, req *pb.WriteMessages
 func (s *StorageServer) ReadMessages(ctx context.Context, req *pb.ReadMessagesRequest) (*pb.ReadMessagesResponse, error) {
 	messages, err := s.store.ReadMessages(ctx, req.Topic, req.PartitionId, req.Offset, int(req.Limit))
 	if err != nil {
-		log.WithContext(ctx).Error("读取消息失败", "topic", req.Topic, "error", err)
+		log.WithContext(ctx).Error("Failed to read messages", "topic", req.Topic, "error", err)
 		return &pb.ReadMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
 
@@ -178,7 +178,7 @@ func (s *StorageServer) SetTTL(ctx context.Context, req *pb.SetTTLRequest) (*pb.
 	return &pb.SetTTLResponse{Success: true}, nil
 }
 
-// --- 状态管理接口实现 ---
+// --- State management interface implementation ---
 
 func (s *StorageServer) SaveConsumer(ctx context.Context, req *pb.SaveConsumerRequest) (*pb.SaveConsumerResponse, error) {
 	c := req.Consumer
@@ -242,11 +242,11 @@ func main() {
 	flag.Parse()
 	log.Init(*logLevel)
 
-	log.Info("Storage Service 启动中", "engine", "Redis/DragonflyDB")
+	log.Info("Starting Storage Service", "engine", "Redis/DragonflyDB")
 
 	store, err := storage.NewRedisStorage(*redisAddr, *redisPass, 0)
 	if err != nil {
-		log.Error("初始化存储失败", "error", err)
+		log.Error("Failed to initialize storage", "error", err)
 		os.Exit(1)
 	}
 	defer store.Close()
@@ -257,14 +257,14 @@ func main() {
 
 	listener, err := net.Listen("tcp", *addr)
 	if err != nil {
-		log.Error("监听端口失败", "error", err)
+		log.Error("Failed to listen on port", "error", err)
 		os.Exit(1)
 	}
 
 	go func() {
-		log.Info("gRPC 服务启动", "addr", *addr)
+		log.Info("gRPC service started", "addr", *addr)
 		if err := grpcServer.Serve(listener); err != nil {
-			log.Error("服务运行异常", "error", err)
+			log.Error("Service runtime error", "error", err)
 			os.Exit(1)
 		}
 	}()
@@ -273,7 +273,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	log.Info("正在优雅关闭服务...")
+	log.Info("Gracefully shutting down service...")
 	grpcServer.GracefulStop()
-	log.Info("服务已关闭")
+	log.Info("Service closed")
 }

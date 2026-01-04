@@ -4,21 +4,21 @@ package gmq;
 
 option go_package = "github.com/chowyu12/gmq/proto;gmq";
 
-// GMQ 消息队列服务
+// GMQ Message Queue Service
 service GMQService {
-  // 双向流：生产和消费消息
+  // Bidirectional stream: produce and consume messages
   rpc Stream(stream StreamMessage) returns (stream StreamMessage);
 
-  // 管理接口：手动创建 Topic
+  // Management interface: manually create Topic
   rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
 }
 
-// 流消息封装
+// Stream message wrapper
 message StreamMessage {
-  // 消息类型
+  // Message type
   MessageType type = 1;
   
-  // 具体消息内容（根据type选择对应字段）
+  // Specific message content (select corresponding field based on type)
   oneof payload {
     PublishRequest publish_req = 2;
     PublishResponse publish_resp = 3;
@@ -34,111 +34,111 @@ message StreamMessage {
   }
 }
 
-// 消息类型
+// Message type
 enum MessageType {
   MESSAGE_TYPE_UNSPECIFIED = 0;
-  // 发布消息请求
+  // Publish message request
   MESSAGE_TYPE_PUBLISH_REQUEST = 1;
-  // 发布消息响应
+  // Publish message response
   MESSAGE_TYPE_PUBLISH_RESPONSE = 2;
-  // 订阅请求
+  // Subscribe request
   MESSAGE_TYPE_SUBSCRIBE_REQUEST = 3;
-  // 订阅响应
+  // Subscribe response
   MESSAGE_TYPE_SUBSCRIBE_RESPONSE = 4;
-  // 消费消息推送
+  // Consume message push
   MESSAGE_TYPE_CONSUME_MESSAGE = 5;
-  // 消息确认请求
+  // Message acknowledgment request
   MESSAGE_TYPE_ACK_REQUEST = 6;
-  // 消息确认响应
+  // Message acknowledgment response
   MESSAGE_TYPE_ACK_RESPONSE = 7;
-  // 心跳请求
+  // Heartbeat request
   MESSAGE_TYPE_HEARTBEAT_REQUEST = 8;
-  // 心跳响应
+  // Heartbeat response
   MESSAGE_TYPE_HEARTBEAT_RESPONSE = 9;
-  // 错误响应
+  // Error response
   MESSAGE_TYPE_ERROR_RESPONSE = 10;
-  // 客户端主动拉取请求
+  // Client-initiated pull request
   MESSAGE_TYPE_PULL_REQUEST = 11;
 }
 
-// QoS 级别
+// QoS level
 enum QoS {
-  // 至多一次 (Fire and Forget)
+  // At most once (Fire and Forget)
   QOS_AT_MOST_ONCE = 0;
-  // 至少一次 (Acknowledged)
+  // At least once (Acknowledged)
   QOS_AT_LEAST_ONCE = 1;
-  // 严格一次 (Exactly Once)
+  // Exactly once
   QOS_EXACTLY_ONCE = 2;
 }
 
-// 发布消息请求 (支持批量)
+// Publish message request (supports batch)
 message PublishRequest {
-  // 请求ID
+  // Request ID
   string request_id = 1;
-  // 消息列表
+  // Message list
   repeated PublishItem items = 2;
 }
 
 message PublishItem {
-  // Topic 名称
+  // Topic name
   string topic = 1;
-  // 分区键（用于确定分区）
+  // Partition key (used to determine partition)
   string partition_key = 2;
-  // 指定分区ID（可选，优先级高于partition_key）
+  // Specify partition ID (optional, priority higher than partition_key)
   int32 partition_id = 3;
-  // 消息体
+  // Message body
   bytes payload = 4;
-  // 消息属性
+  // Message properties
   map<string, string> properties = 5;
-  // QoS 级别
+  // QoS level
   QoS qos = 6;
-  // 生产端幂等支持
+  // Producer idempotency support
   string producer_id = 7;
   int64 sequence_number = 8;
 }
 
-// 发布消息响应 (支持批量)
+// Publish message response (supports batch)
 message PublishResponse {
-  // 请求ID
+  // Request ID
   string request_id = 1;
-  // 结果列表
+  // Result list
   repeated PublishResult results = 2;
 }
 
 message PublishResult {
-  // 是否成功
+  // Whether successful
   bool success = 1;
-  // 消息ID
+  // Message ID
   string message_id = 2;
-  // Topic 名称
+  // Topic name
   string topic = 3;
-  // 实际分区ID
+  // Actual partition ID
   int32 partition_id = 4;
-  // 错误信息
+  // Error message
   string error_message = 5;
 }
 
-// 订阅请求
+// Subscribe request
 message SubscribeRequest {
-  // 请求ID
+  // Request ID
   string request_id = 1;
-  // Topic 名称
+  // Topic name
   string topic = 2;
-  // 消费组名称
+  // Consumer group name
   string consumer_group = 3;
-  // 消费者ID
+  // Consumer ID
   string consumer_id = 4;
-  // QoS 级别
+  // QoS level
   QoS qos = 5;
-  // 订阅的分区列表（为空则订阅所有分区）
+  // List of subscribed partitions (empty means subscribe to all partitions)
   repeated int32 partitions = 6;
-  // 拉取间隔（毫秒），可选
+  // Pull interval (milliseconds), optional
   int32 pull_interval_ms = 7;
-  // 客户端标识，可选
+  // Client identifier, optional
   string client_id = 8;
 }
 
-// 手动创建 Topic 请求
+// Manually create Topic request
 message CreateTopicRequest {
   string topic = 1;
   int32 partitions = 2;
@@ -150,53 +150,53 @@ message CreateTopicResponse {
   string error_message = 2;
 }
 
-// 订阅响应
+// Subscribe response
 message SubscribeResponse {
-  // 请求ID
+  // Request ID
   string request_id = 1;
-  // 是否成功
+  // Whether successful
   bool success = 2;
-  // 分配的分区列表
+  // Assigned partition list
   repeated int32 assigned_partitions = 3;
-  // 错误信息
+  // Error message
   string error_message = 4;
 }
 
-// 消费消息 (支持批量推送)
+// Consume message (supports batch push)
 message ConsumeMessage {
   repeated MessageItem items = 1;
 }
 
 message MessageItem {
-  // 消息ID
+  // Message ID
   string message_id = 1;
-  // Topic 名称
+  // Topic name
   string topic = 2;
-  // 分区ID
+  // Partition ID
   int32 partition_id = 3;
-  // 偏移量
+  // Offset
   int64 offset = 4;
-  // 消息体
+  // Message body
   bytes payload = 5;
-  // 消息属性
+  // Message properties
   map<string, string> properties = 6;
-  // 时间戳
+  // Timestamp
   int64 timestamp = 7;
-  // QoS 级别
+  // QoS level
   QoS qos = 8;
-  // 分区路由 Key
+  // Partition routing key
   string key = 9;
 }
 
-// 消息确认请求 (支持批量确认)
+// Message acknowledgment request (supports batch acknowledgment)
 message AckRequest {
-  // 请求ID
+  // Request ID
   string request_id = 1;
-  // 消费组
+  // Consumer group
   string consumer_group = 2;
-  // 消费者ID
+  // Consumer ID
   string consumer_id = 3;
-  // 确认项列表
+  // Acknowledgment item list
   repeated AckItem items = 4;
 }
 
@@ -207,39 +207,39 @@ message AckItem {
   int64 offset = 4;
 }
 
-// 消息确认响应
+// Message acknowledgment response
 message AckResponse {
-  // 请求ID
+  // Request ID
   string request_id = 1;
-  // 是否成功
+  // Whether successful
   bool success = 2;
-  // 错误信息
+  // Error message
   string error_message = 3;
 }
 
-// 心跳请求
+// Heartbeat request
 message HeartbeatRequest {
-  // 消费者ID
+  // Consumer ID
   string consumer_id = 1;
-  // 消费组
+  // Consumer group
   string consumer_group = 2;
 }
 
-// 心跳响应
+// Heartbeat response
 message HeartbeatResponse {
-  // 是否成功
+  // Whether successful
   bool success = 1;
 }
 
-// 错误响应
+// Error response
 message ErrorResponse {
-  // 错误码
+  // Error code
   int32 code = 1;
-  // 错误信息
+  // Error message
   string message = 2;
 }
 
-// 客户端主动拉取消息请求
+// Client-initiated pull message request
 message PullRequest {
   string consumer_id = 1;
   string consumer_group = 2;

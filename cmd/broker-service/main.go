@@ -20,10 +20,10 @@ import (
 )
 
 var (
-	addr              = flag.String("addr", ":50051", "Broker 地址")
-	storageAddr       = flag.String("storage", "localhost:50052", "Storage 地址")
-	defaultPartitions = flag.Int("partitions", 4, "默认分区数")
-	logLevel          = flag.String("log-level", "info", "日志级别")
+	addr              = flag.String("addr", ":50051", "Broker service address")
+	storageAddr       = flag.String("storage", "localhost:50052", "Storage service address")
+	defaultPartitions = flag.Int("partitions", 4, "Default number of partitions")
+	logLevel          = flag.String("log-level", "info", "Log level")
 )
 
 type BrokerServer struct {
@@ -84,7 +84,7 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 	for {
 		var allItems []*pb.MessageItem
 		for _, partID := range myPartitions {
-			// 直接原子拉取：获取进度、读取、更新进度三合一
+			// Atomic fetch: get offset, read messages, and update offset in one operation
 			resp, err := s.storageClient.FetchMessages(ctx, &storagepb.FetchMessagesRequest{
 				Topic:         req.Topic,
 				PartitionId:   partID,
@@ -131,8 +131,8 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 }
 
 func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.AckRequest) {
-	// 在 Fetch-and-Update 架构下，Ack 用于保证 At-Least-Once
-	// 这里目前主要做返回响应
+	// In Fetch-and-Update architecture, Ack is used to guarantee At-Least-Once delivery
+	// Currently, this mainly returns a response
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_ACK_RESPONSE,
 		Payload: &pb.StreamMessage_AckResp{
@@ -148,17 +148,17 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 		msgID := xid.New().String()
 		partID := item.PartitionId
 
-		// 路由逻辑：
-		// 1. 如果指定了 PartitionId (>=0)，直接使用
-		// 2. 否则如果指定了 PartitionKey，根据 Key Hash 路由
-		// 3. 否则，随机分配 (目前简化为随机 ID 取模)
+		// Routing logic:
+		// 1. If PartitionId is specified (>=0), use it directly
+		// 2. Otherwise, if PartitionKey is specified, route based on Key Hash
+		// 3. Otherwise, random assignment (currently simplified to random ID modulo)
 		if partID < 0 {
 			if item.PartitionKey != "" {
 				h := fnv.New32a()
 				h.Write([]byte(item.PartitionKey))
 				partID = int32(h.Sum32() % uint32(s.partitions))
 			} else {
-				// 随机
+				// Random assignment
 				partID = int32(fnv.New32a().Sum32() % uint32(s.partitions))
 			}
 		}
@@ -248,7 +248,7 @@ func main() {
 	srv := grpc.NewServer()
 	pb.RegisterGMQServiceServer(srv, NewBrokerServer(storage, int32(*defaultPartitions)))
 	l, _ := net.Listen("tcp", *addr)
-	log.Info("Broker 启动", "addr", *addr)
+	log.Info("Broker started", "addr", *addr)
 	go srv.Serve(l)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)

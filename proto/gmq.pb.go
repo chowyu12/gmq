@@ -21,32 +21,32 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// 消息类型
+// Message type
 type MessageType int32
 
 const (
 	MessageType_MESSAGE_TYPE_UNSPECIFIED MessageType = 0
-	// 发布消息请求
+	// Publish message request
 	MessageType_MESSAGE_TYPE_PUBLISH_REQUEST MessageType = 1
-	// 发布消息响应
+	// Publish message response
 	MessageType_MESSAGE_TYPE_PUBLISH_RESPONSE MessageType = 2
-	// 订阅请求
+	// Subscribe request
 	MessageType_MESSAGE_TYPE_SUBSCRIBE_REQUEST MessageType = 3
-	// 订阅响应
+	// Subscribe response
 	MessageType_MESSAGE_TYPE_SUBSCRIBE_RESPONSE MessageType = 4
-	// 消费消息推送
+	// Consume message push
 	MessageType_MESSAGE_TYPE_CONSUME_MESSAGE MessageType = 5
-	// 消息确认请求
+	// Message acknowledgment request
 	MessageType_MESSAGE_TYPE_ACK_REQUEST MessageType = 6
-	// 消息确认响应
+	// Message acknowledgment response
 	MessageType_MESSAGE_TYPE_ACK_RESPONSE MessageType = 7
-	// 心跳请求
+	// Heartbeat request
 	MessageType_MESSAGE_TYPE_HEARTBEAT_REQUEST MessageType = 8
-	// 心跳响应
+	// Heartbeat response
 	MessageType_MESSAGE_TYPE_HEARTBEAT_RESPONSE MessageType = 9
-	// 错误响应
+	// Error response
 	MessageType_MESSAGE_TYPE_ERROR_RESPONSE MessageType = 10
-	// 客户端主动拉取请求
+	// Client-initiated pull request
 	MessageType_MESSAGE_TYPE_PULL_REQUEST MessageType = 11
 )
 
@@ -109,15 +109,15 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 	return file_proto_gmq_proto_rawDescGZIP(), []int{0}
 }
 
-// QoS 级别
+// QoS level
 type QoS int32
 
 const (
-	// 至多一次 (Fire and Forget)
+	// At most once (Fire and Forget)
 	QoS_QOS_AT_MOST_ONCE QoS = 0
-	// 至少一次 (Acknowledged)
+	// At least once (Acknowledged)
 	QoS_QOS_AT_LEAST_ONCE QoS = 1
-	// 严格一次 (Exactly Once)
+	// Exactly once
 	QoS_QOS_EXACTLY_ONCE QoS = 2
 )
 
@@ -162,12 +162,12 @@ func (QoS) EnumDescriptor() ([]byte, []int) {
 	return file_proto_gmq_proto_rawDescGZIP(), []int{1}
 }
 
-// 流消息封装
+// Stream message wrapper
 type StreamMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 消息类型
+	// Message type
 	Type MessageType `protobuf:"varint,1,opt,name=type,proto3,enum=gmq.MessageType" json:"type,omitempty"`
-	// 具体消息内容（根据type选择对应字段）
+	// Specific message content (select corresponding field based on type)
 	//
 	// Types that are valid to be assigned to Payload:
 	//
@@ -400,12 +400,12 @@ func (*StreamMessage_ErrorResp) isStreamMessage_Payload() {}
 
 func (*StreamMessage_PullReq) isStreamMessage_Payload() {}
 
-// 发布消息请求 (支持批量)
+// Publish message request (supports batch)
 type PublishRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 请求ID
+	// Request ID
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 消息列表
+	// Message list
 	Items         []*PublishItem `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -457,19 +457,19 @@ func (x *PublishRequest) GetItems() []*PublishItem {
 
 type PublishItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Topic 名称
+	// Topic name
 	Topic string `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	// 分区键（用于确定分区）
+	// Partition key (used to determine partition)
 	PartitionKey string `protobuf:"bytes,2,opt,name=partition_key,json=partitionKey,proto3" json:"partition_key,omitempty"`
-	// 指定分区ID（可选，优先级高于partition_key）
+	// Specify partition ID (optional, priority higher than partition_key)
 	PartitionId int32 `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
-	// 消息体
+	// Message body
 	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
-	// 消息属性
+	// Message properties
 	Properties map[string]string `protobuf:"bytes,5,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// QoS 级别
+	// QoS level
 	Qos QoS `protobuf:"varint,6,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
-	// 生产端幂等支持
+	// Producer idempotency support
 	ProducerId     string `protobuf:"bytes,7,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
 	SequenceNumber int64  `protobuf:"varint,8,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -562,12 +562,12 @@ func (x *PublishItem) GetSequenceNumber() int64 {
 	return 0
 }
 
-// 发布消息响应 (支持批量)
+// Publish message response (supports batch)
 type PublishResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 请求ID
+	// Request ID
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 结果列表
+	// Result list
 	Results       []*PublishResult `protobuf:"bytes,2,rep,name=results,proto3" json:"results,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -619,15 +619,15 @@ func (x *PublishResponse) GetResults() []*PublishResult {
 
 type PublishResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 是否成功
+	// Whether successful
 	Success bool `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	// 消息ID
+	// Message ID
 	MessageId string `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// Topic 名称
+	// Topic name
 	Topic string `protobuf:"bytes,3,opt,name=topic,proto3" json:"topic,omitempty"`
-	// 实际分区ID
+	// Actual partition ID
 	PartitionId int32 `protobuf:"varint,4,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
-	// 错误信息
+	// Error message
 	ErrorMessage  string `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -698,24 +698,24 @@ func (x *PublishResult) GetErrorMessage() string {
 	return ""
 }
 
-// 订阅请求
+// Subscribe request
 type SubscribeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 请求ID
+	// Request ID
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// Topic 名称
+	// Topic name
 	Topic string `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	// 消费组名称
+	// Consumer group name
 	ConsumerGroup string `protobuf:"bytes,3,opt,name=consumer_group,json=consumerGroup,proto3" json:"consumer_group,omitempty"`
-	// 消费者ID
+	// Consumer ID
 	ConsumerId string `protobuf:"bytes,4,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
-	// QoS 级别
+	// QoS level
 	Qos QoS `protobuf:"varint,5,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
-	// 订阅的分区列表（为空则订阅所有分区）
+	// List of subscribed partitions (empty means subscribe to all partitions)
 	Partitions []int32 `protobuf:"varint,6,rep,packed,name=partitions,proto3" json:"partitions,omitempty"`
-	// 拉取间隔（毫秒），可选
+	// Pull interval (milliseconds), optional
 	PullIntervalMs int32 `protobuf:"varint,7,opt,name=pull_interval_ms,json=pullIntervalMs,proto3" json:"pull_interval_ms,omitempty"`
-	// 客户端标识，可选
+	// Client identifier, optional
 	ClientId      string `protobuf:"bytes,8,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -807,7 +807,7 @@ func (x *SubscribeRequest) GetClientId() string {
 	return ""
 }
 
-// 手动创建 Topic 请求
+// Manually create Topic request
 type CreateTopicRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
@@ -920,16 +920,16 @@ func (x *CreateTopicResponse) GetErrorMessage() string {
 	return ""
 }
 
-// 订阅响应
+// Subscribe response
 type SubscribeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 请求ID
+	// Request ID
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 是否成功
+	// Whether successful
 	Success bool `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	// 分配的分区列表
+	// Assigned partition list
 	AssignedPartitions []int32 `protobuf:"varint,3,rep,packed,name=assigned_partitions,json=assignedPartitions,proto3" json:"assigned_partitions,omitempty"`
-	// 错误信息
+	// Error message
 	ErrorMessage  string `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -993,7 +993,7 @@ func (x *SubscribeResponse) GetErrorMessage() string {
 	return ""
 }
 
-// 消费消息 (支持批量推送)
+// Consume message (supports batch push)
 type ConsumeMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*MessageItem         `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -1040,23 +1040,23 @@ func (x *ConsumeMessage) GetItems() []*MessageItem {
 
 type MessageItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 消息ID
+	// Message ID
 	MessageId string `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// Topic 名称
+	// Topic name
 	Topic string `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	// 分区ID
+	// Partition ID
 	PartitionId int32 `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
-	// 偏移量
+	// Offset
 	Offset int64 `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
-	// 消息体
+	// Message body
 	Payload []byte `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
-	// 消息属性
+	// Message properties
 	Properties map[string]string `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// 时间戳
+	// Timestamp
 	Timestamp int64 `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	// QoS 级别
+	// QoS level
 	Qos QoS `protobuf:"varint,8,opt,name=qos,proto3,enum=gmq.QoS" json:"qos,omitempty"`
-	// 分区路由 Key
+	// Partition routing key
 	Key           string `protobuf:"bytes,9,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1155,16 +1155,16 @@ func (x *MessageItem) GetKey() string {
 	return ""
 }
 
-// 消息确认请求 (支持批量确认)
+// Message acknowledgment request (supports batch acknowledgment)
 type AckRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 请求ID
+	// Request ID
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 消费组
+	// Consumer group
 	ConsumerGroup string `protobuf:"bytes,2,opt,name=consumer_group,json=consumerGroup,proto3" json:"consumer_group,omitempty"`
-	// 消费者ID
+	// Consumer ID
 	ConsumerId string `protobuf:"bytes,3,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
-	// 确认项列表
+	// Acknowledgment item list
 	Items         []*AckItem `protobuf:"bytes,4,rep,name=items,proto3" json:"items,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1296,14 +1296,14 @@ func (x *AckItem) GetOffset() int64 {
 	return 0
 }
 
-// 消息确认响应
+// Message acknowledgment response
 type AckResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 请求ID
+	// Request ID
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 是否成功
+	// Whether successful
 	Success bool `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	// 错误信息
+	// Error message
 	ErrorMessage  string `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1360,12 +1360,12 @@ func (x *AckResponse) GetErrorMessage() string {
 	return ""
 }
 
-// 心跳请求
+// Heartbeat request
 type HeartbeatRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 消费者ID
+	// Consumer ID
 	ConsumerId string `protobuf:"bytes,1,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
-	// 消费组
+	// Consumer group
 	ConsumerGroup string `protobuf:"bytes,2,opt,name=consumer_group,json=consumerGroup,proto3" json:"consumer_group,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1415,10 +1415,10 @@ func (x *HeartbeatRequest) GetConsumerGroup() string {
 	return ""
 }
 
-// 心跳响应
+// Heartbeat response
 type HeartbeatResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 是否成功
+	// Whether successful
 	Success       bool `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1461,12 +1461,12 @@ func (x *HeartbeatResponse) GetSuccess() bool {
 	return false
 }
 
-// 错误响应
+// Error response
 type ErrorResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 错误码
+	// Error code
 	Code int32 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	// 错误信息
+	// Error message
 	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1516,7 +1516,7 @@ func (x *ErrorResponse) GetMessage() string {
 	return ""
 }
 
-// 客户端主动拉取消息请求
+// Client-initiated pull message request
 type PullRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ConsumerId    string                 `protobuf:"bytes,1,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`

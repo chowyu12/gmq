@@ -27,11 +27,11 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// GMQ 消息队列服务
+// GMQ Message Queue Service
 type GMQServiceClient interface {
-	// 双向流：生产和消费消息
+	// Bidirectional stream: produce and consume messages
 	Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[StreamMessage, StreamMessage], error)
-	// 管理接口：手动创建 Topic
+	// Management interface: manually create Topic
 	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
 }
 
@@ -70,11 +70,11 @@ func (c *gMQServiceClient) CreateTopic(ctx context.Context, in *CreateTopicReque
 // All implementations must embed UnimplementedGMQServiceServer
 // for forward compatibility.
 //
-// GMQ 消息队列服务
+// GMQ Message Queue Service
 type GMQServiceServer interface {
-	// 双向流：生产和消费消息
+	// Bidirectional stream: produce and consume messages
 	Stream(grpc.BidiStreamingServer[StreamMessage, StreamMessage]) error
-	// 管理接口：手动创建 Topic
+	// Management interface: manually create Topic
 	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
 	mustEmbedUnimplementedGMQServiceServer()
 }

@@ -149,7 +149,7 @@ func (x *FetchMessagesResponse) GetMessages() []*Message {
 	return nil
 }
 
-// 消息结构
+// Message structure
 type Message struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -160,10 +160,10 @@ type Message struct {
 	Properties  map[string]string      `protobuf:"bytes,6,rep,name=properties,proto3" json:"properties,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Timestamp   int64                  `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Qos         int32                  `protobuf:"varint,8,opt,name=qos,proto3" json:"qos,omitempty"`
-	// 生产端幂等支持
+	// Producer idempotency support
 	ProducerId     string `protobuf:"bytes,9,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
 	SequenceNumber int64  `protobuf:"varint,10,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
-	// 分区路由 Key
+	// Partition routing key
 	Key           string `protobuf:"bytes,11,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

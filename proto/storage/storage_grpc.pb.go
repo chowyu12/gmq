@@ -39,9 +39,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Storage Service - 存储服务接口
+// Storage Service - Storage service interface
 type StorageServiceClient interface {
-	// --- 消息接口 ---
+	// --- Message interface ---
 	WriteMessages(ctx context.Context, in *WriteMessagesRequest, opts ...grpc.CallOption) (*WriteMessagesResponse, error)
 	ReadMessages(ctx context.Context, in *ReadMessagesRequest, opts ...grpc.CallOption) (*ReadMessagesResponse, error)
 	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
@@ -50,17 +50,17 @@ type StorageServiceClient interface {
 	GetOffset(ctx context.Context, in *GetOffsetRequest, opts ...grpc.CallOption) (*GetOffsetResponse, error)
 	ListPartitions(ctx context.Context, in *ListPartitionsRequest, opts ...grpc.CallOption) (*ListPartitionsResponse, error)
 	SetTTL(ctx context.Context, in *SetTTLRequest, opts ...grpc.CallOption) (*SetTTLResponse, error)
-	// 保存/更新消费者信息
+	// Save/update consumer information
 	SaveConsumer(ctx context.Context, in *SaveConsumerRequest, opts ...grpc.CallOption) (*SaveConsumerResponse, error)
-	// 获取消费组下所有消费者
+	// Get all consumers in a consumer group
 	GetConsumers(ctx context.Context, in *GetConsumersRequest, opts ...grpc.CallOption) (*GetConsumersResponse, error)
-	// 删除消费者
+	// Delete consumer
 	DeleteConsumer(ctx context.Context, in *DeleteConsumerRequest, opts ...grpc.CallOption) (*DeleteConsumerResponse, error)
-	// 更新消费组分配信息
+	// Update consumer group assignment information
 	UpdateGroupAssignment(ctx context.Context, in *UpdateGroupAssignmentRequest, opts ...grpc.CallOption) (*UpdateGroupAssignmentResponse, error)
-	// 获取消费组分配信息
+	// Get consumer group assignment information
 	GetGroupAssignment(ctx context.Context, in *GetGroupAssignmentRequest, opts ...grpc.CallOption) (*GetGroupAssignmentResponse, error)
-	// 原子拉取：获取当前进度 -> 读取消息 -> 更新进度 (原子操作)
+	// Atomic fetch: get current offset -> read messages -> update offset (atomic operation)
 	FetchMessages(ctx context.Context, in *FetchMessagesRequest, opts ...grpc.CallOption) (*FetchMessagesResponse, error)
 }
 
@@ -216,9 +216,9 @@ func (c *storageServiceClient) FetchMessages(ctx context.Context, in *FetchMessa
 // All implementations must embed UnimplementedStorageServiceServer
 // for forward compatibility.
 //
-// Storage Service - 存储服务接口
+// Storage Service - Storage service interface
 type StorageServiceServer interface {
-	// --- 消息接口 ---
+	// --- Message interface ---
 	WriteMessages(context.Context, *WriteMessagesRequest) (*WriteMessagesResponse, error)
 	ReadMessages(context.Context, *ReadMessagesRequest) (*ReadMessagesResponse, error)
 	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
@@ -227,17 +227,17 @@ type StorageServiceServer interface {
 	GetOffset(context.Context, *GetOffsetRequest) (*GetOffsetResponse, error)
 	ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error)
 	SetTTL(context.Context, *SetTTLRequest) (*SetTTLResponse, error)
-	// 保存/更新消费者信息
+	// Save/update consumer information
 	SaveConsumer(context.Context, *SaveConsumerRequest) (*SaveConsumerResponse, error)
-	// 获取消费组下所有消费者
+	// Get all consumers in a consumer group
 	GetConsumers(context.Context, *GetConsumersRequest) (*GetConsumersResponse, error)
-	// 删除消费者
+	// Delete consumer
 	DeleteConsumer(context.Context, *DeleteConsumerRequest) (*DeleteConsumerResponse, error)
-	// 更新消费组分配信息
+	// Update consumer group assignment information
 	UpdateGroupAssignment(context.Context, *UpdateGroupAssignmentRequest) (*UpdateGroupAssignmentResponse, error)
-	// 获取消费组分配信息
+	// Get consumer group assignment information
 	GetGroupAssignment(context.Context, *GetGroupAssignmentRequest) (*GetGroupAssignmentResponse, error)
-	// 原子拉取：获取当前进度 -> 读取消息 -> 更新进度 (原子操作)
+	// Atomic fetch: get current offset -> read messages -> update offset (atomic operation)
 	FetchMessages(context.Context, *FetchMessagesRequest) (*FetchMessagesResponse, error)
 	mustEmbedUnimplementedStorageServiceServer()
 }

@@ -10,14 +10,14 @@ import (
 var defaultLogger *slog.Logger
 
 func init() {
-	// 默认使用 Info 级别
+	// Default to Info level
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}
 	defaultLogger = slog.New(slog.NewJSONHandler(os.Stdout, opts))
 }
 
-// Init 初始化全局日志配置
+// Init initializes global log configuration
 func Init(level string) {
 	var l slog.Level
 	switch strings.ToLower(level) {
@@ -36,7 +36,7 @@ func Init(level string) {
 	opts := &slog.HandlerOptions{
 		Level: l,
 	}
-	// 生产环境建议使用 JSONHandler，开发环境可以用 TextHandler
+	// Production environments should use JSONHandler, development can use TextHandler
 	defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, opts))
 }
 
@@ -56,7 +56,7 @@ func Warn(msg string, args ...any) {
 	defaultLogger.Warn(msg, args...)
 }
 
-// WithContext 支持 Context 的日志，便于链路追踪扩展
+// WithContext supports Context-based logging for traceability extension
 func WithContext(ctx context.Context) *slog.Logger {
 	return defaultLogger
 }

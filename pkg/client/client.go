@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// MessageContext 消息处理上下文
+// MessageContext message processing context
 type MessageContext interface {
 	context.Context
 	Messages() []*pb.MessageItem
@@ -75,7 +75,7 @@ func (c *baseClient) connect() error {
 		grpc.WithBlock(),
 		grpc.WithTimeout(5*time.Second))
 	if err != nil {
-		return fmt.Errorf("连接服务器失败: %w", err)
+		return fmt.Errorf("failed to connect to server: %w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c.conn = conn
@@ -86,7 +86,7 @@ func (c *baseClient) connect() error {
 	if err != nil {
 		conn.Close()
 		cancel()
-		return fmt.Errorf("建立流连接失败: %w", err)
+		return fmt.Errorf("failed to establish stream connection: %w", err)
 	}
 	c.stream = stream
 	return nil
@@ -268,7 +268,7 @@ func (p *Producer) Publish(ctx context.Context, items []*pb.PublishItem) (*pb.Pu
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("等待发布响应超时")
+		return nil, fmt.Errorf("timeout waiting for publish response")
 	}
 }
 
@@ -286,6 +286,7 @@ type Consumer struct {
 	topic      string
 	msgChan    chan *pb.ConsumeMessage
 	pullSignal chan struct{}
+	pullLimit  int32
 }
 
 type ConsumerConfig struct {
@@ -295,12 +296,13 @@ type ConsumerConfig struct {
 	ClientID      string
 	Topic         string
 	PrefetchCount int
+	PullLimit     int // Maximum number of messages per pull request (default: 100)
 	ErrorHandler  ErrorHandler
 }
 
 func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	if cfg.ConsumerGroup == "" {
-		return nil, fmt.Errorf("消费者必须提供 ConsumerGroup 配置")
+		return nil, fmt.Errorf("consumer must provide ConsumerGroup configuration")
 	}
 	bc, err := newBaseClient(cfg.ServerAddr, cfg.ErrorHandler)
 	if err != nil { return nil, err }
@@ -308,27 +310,32 @@ func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	if cfg.ConsumerID == "" { bc.consumerID = "c-" + xid.New().String() } else { bc.consumerID = cfg.ConsumerID }
 	if cfg.ClientID == "" { bc.clientID = "cli-" + xid.New().String() } else { bc.clientID = cfg.ClientID }
 	if cfg.PrefetchCount <= 0 { cfg.PrefetchCount = 100 }
+	pullLimit := int32(100) // Default to 100 to prevent memory overflow
+	if cfg.PullLimit > 0 {
+		pullLimit = int32(cfg.PullLimit)
+	}
 	c := &Consumer{
 		baseClient: bc,
 		topic:      cfg.Topic,
 		msgChan:    make(chan *pb.ConsumeMessage, cfg.PrefetchCount),
 		pullSignal: make(chan struct{}, 1),
+		pullLimit:  pullLimit,
 	}
 	go c.receiveLoop(c.enqueueMessage, c.onReconnect)
 	go c.heartbeatLoop()
 	go c.pullDriverLoop()
 	if err := c.subscribe(context.Background()); err != nil {
 		bc.Close()
-		return nil, fmt.Errorf("初始订阅失败: %w", err)
+		return nil, fmt.Errorf("initial subscription failed: %w", err)
 	}
 	c.triggerPull()
 	return c, nil
 }
 
 func (c *Consumer) onReconnect() {
-	log.Info("正在恢复订阅...", "topic", c.topic)
+	log.Info("Restoring subscription...", "topic", c.topic)
 	if err := c.subscribe(context.Background()); err != nil {
-		log.Error("恢复订阅失败", "topic", c.topic, "error", err)
+		log.Error("Failed to restore subscription", "topic", c.topic, "error", err)
 	}
 }
 
@@ -353,7 +360,7 @@ func (c *Consumer) pullDriverLoop() {
 			Payload: &pb.StreamMessage_PullReq{
 				PullReq: &pb.PullRequest{
 					ConsumerId: c.consumerID, ConsumerGroup: c.consumerGroup,
-					Topic: c.topic, Limit: 1000,
+					Topic: c.topic, Limit: c.pullLimit,
 				},
 			},
 		}
@@ -421,13 +428,13 @@ func (c *Consumer) subscribe(ctx context.Context) error {
 	select {
 	case resp := <-respChan:
 		if !resp.GetSubscribeResp().Success {
-			return fmt.Errorf("订阅失败: %s", resp.GetSubscribeResp().ErrorMessage)
+			return fmt.Errorf("subscription failed: %s", resp.GetSubscribeResp().ErrorMessage)
 		}
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(10 * time.Second):
-		return fmt.Errorf("等待订阅响应超时")
+		return fmt.Errorf("timeout waiting for subscription response")
 	}
 }
 

@@ -4,9 +4,9 @@ package storage;
 
 option go_package = "github.com/chowyu12/gmq/proto/storage;storage";
 
-// Storage Service - 存储服务接口
+// Storage Service - Storage service interface
 service StorageService {
-  // --- 消息接口 ---
+  // --- Message interface ---
   rpc WriteMessages(WriteMessagesRequest) returns (WriteMessagesResponse);
   rpc ReadMessages(ReadMessagesRequest) returns (ReadMessagesResponse);
   rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse);
@@ -16,21 +16,21 @@ service StorageService {
   rpc ListPartitions(ListPartitionsRequest) returns (ListPartitionsResponse);
   rpc SetTTL(SetTTLRequest) returns (SetTTLResponse);
 
-  // --- 消费者和消费组状态管理 (强一致性存储) ---
+  // --- Consumer and consumer group state management (strong consistency storage) ---
   
-  // 保存/更新消费者信息
+  // Save/update consumer information
   rpc SaveConsumer(SaveConsumerRequest) returns (SaveConsumerResponse);
-  // 获取消费组下所有消费者
+  // Get all consumers in a consumer group
   rpc GetConsumers(GetConsumersRequest) returns (GetConsumersResponse);
-  // 删除消费者
+  // Delete consumer
   rpc DeleteConsumer(DeleteConsumerRequest) returns (DeleteConsumerResponse);
   
-  // 更新消费组分配信息
+  // Update consumer group assignment information
   rpc UpdateGroupAssignment(UpdateGroupAssignmentRequest) returns (UpdateGroupAssignmentResponse);
-  // 获取消费组分配信息
+  // Get consumer group assignment information
   rpc GetGroupAssignment(GetGroupAssignmentRequest) returns (GetGroupAssignmentResponse);
 
-  // 原子拉取：获取当前进度 -> 读取消息 -> 更新进度 (原子操作)
+  // Atomic fetch: get current offset -> read messages -> update offset (atomic operation)
   rpc FetchMessages(FetchMessagesRequest) returns (FetchMessagesResponse);
 }
 
@@ -47,7 +47,7 @@ message FetchMessagesResponse {
   repeated Message messages = 3;
 }
 
-// 消息结构
+// Message structure
 message Message {
   string id = 1;
   string topic = 2;
@@ -57,10 +57,10 @@ message Message {
   map<string, string> properties = 6;
   int64 timestamp = 7;
   int32 qos = 8;
-  // 生产端幂等支持
+  // Producer idempotency support
   string producer_id = 9;
   int64 sequence_number = 10;
-  // 分区路由 Key
+  // Partition routing key
   string key = 11;
 }
 
@@ -159,7 +159,7 @@ message SetTTLResponse {
   string error_message = 2;
 }
 
-// --- 消费者管理相关消息 ---
+// --- Consumer management related messages ---
 
 message ConsumerState {
   string consumer_id = 1;
