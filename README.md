@@ -140,9 +140,6 @@ for {
 | `make clean` | Clean build artifacts and storage data |
 | `make proto` | Regenerate gRPC protocol code |
 
-## 📜 Architecture Evolution
-
-For detailed evolution history of this project from single-machine to distributed Broker merge, please refer to [ARCHITECTURE-EVOLUTION.md](ARCHITECTURE-EVOLUTION.md).
 
 ---
 
