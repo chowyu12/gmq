@@ -15,13 +15,13 @@ import (
 
 func main() {
 	log.Init("debug")
-	log.Info("=== GMQ 消费组示例 ===")
-	log.Info("启动多个消费者组成消费组，演示负载均衡...")
+	log.Info("=== GMQ Consumer Group Example ===")
+	log.Info("Starting multiple consumers in a group to demonstrate load balancing...")
 
 	consumerGroup := "demo-consumer-group"
 	topic := "test-topic"
 
-	// 启动 3 个消费者
+	// Start 3 consumers
 	var wg sync.WaitGroup
 	for i := 1; i <= 3; i++ {
 		wg.Add(1)
@@ -29,15 +29,15 @@ func main() {
 			defer wg.Done()
 			startConsumer(id, consumerGroup, topic)
 		}(i)
-		time.Sleep(500 * time.Millisecond) // 错开启动时间
+		time.Sleep(500 * time.Millisecond) // Stagger start times
 	}
 
-	// 等待退出信号
+	// Wait for exit signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	log.Info("正在关闭所有消费者...")
+	log.Info("Shutting down all consumers...")
 }
 
 func startConsumer(id int, consumerGroup, topic string) {
@@ -55,22 +55,26 @@ func startConsumer(id int, consumerGroup, topic string) {
 		ConsumerID:    consumerID,
 		Topic:         topic,
 		ErrorHandler: func(err error) {
-			log.Error("消费者错误", "consumerID", consumerID, "error", err)
+			log.Error("Consumer error", "consumerID", consumerID, "error", err)
 		},
 	})
 	if err != nil {
-		log.Error("创建消费者失败", "consumerID", consumerID, "error", err)
+		log.Error("Failed to create consumer", "consumerID", consumerID, "error", err)
 		return
 	}
 	defer consumer.Close()
 
-	log.Info("消费者已启动，进入接收循环...", "consumerID", consumerID, "topic", topic)
+	log.Info("Consumer started, entering receive loop...", "consumerID", consumerID, "topic", topic)
 
 	for {
 		mctx, err := consumer.Receive(context.Background(), 10*time.Second)
 		if err != nil && err != context.DeadlineExceeded {
-			log.Error("接收消息失败", "consumerID", consumerID, "error", err)
+			log.Error("Failed to receive messages", "consumerID", consumerID, "error", err)
 			break
+		}
+
+		if mctx == nil {
+			continue
 		}
 
 		msgs := mctx.Messages()
@@ -79,21 +83,21 @@ func startConsumer(id int, consumerGroup, topic string) {
 		currentTotal := messageCount
 		mu.Unlock()
 
-		log.Info(">>> 收到消息批次",
+		log.Info(">>> Received message batch",
 			"consumer", consumerID,
 			"batchSize", len(msgs),
 			"totalReceived", currentTotal)
 
-		// 模拟批量业务处理
+		// Simulate business processing
 		for _, msg := range msgs {
-			log.Debug("处理消息", "msgID", msg.MessageId, "payload", string(msg.Payload))
+			log.Debug("Processing message", "payload", string(msg.Payload))
 		}
 
-		// 显式批量确认
+		// Explicit batch acknowledgment
 		if err := mctx.Ack(); err != nil {
-			log.Error("批量确认失败", "consumerID", consumerID, "error", err)
+			log.Error("Failed to acknowledge batch", "consumerID", consumerID, "error", err)
 		} else {
-			log.Info("<<< 批次确认成功", "consumerID", consumerID, "count", len(msgs))
+			log.Info("<<< Batch acknowledged successfully", "consumerID", consumerID, "count", len(msgs))
 		}
 	}
 }

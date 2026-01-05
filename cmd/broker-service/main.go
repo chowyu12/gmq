@@ -3,18 +3,21 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"hash/fnv"
 	"io"
 	"math/rand"
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/chowyu12/gmq/pkg/log"
 	pb "github.com/chowyu12/gmq/proto"
 	storagepb "github.com/chowyu12/gmq/proto/storage"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/xid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,20 +34,68 @@ type BrokerServer struct {
 	pb.UnimplementedGMQServiceServer
 	storageClient storagepb.StorageServiceClient
 	partitions    int32
+	redisClient   *redis.Client // Redis client for pub/sub notifications
+
+	// Global Signal Hub: one Redis subscription for all consumers
+	listenersMu sync.RWMutex
+	listeners   map[string]map[chan struct{}]struct{}
 }
 
-func NewBrokerServer(client storagepb.StorageServiceClient, partitions int32) *BrokerServer {
-	return &BrokerServer{storageClient: client, partitions: partitions}
+func NewBrokerServer(client storagepb.StorageServiceClient, partitions int32, redisAddr string) *BrokerServer {
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
+	s := &BrokerServer{
+		storageClient: client,
+		partitions:    int32(partitions),
+		redisClient:   rdb,
+		listeners:     make(map[string]map[chan struct{}]struct{}),
+	}
+	go s.startSignalLoop()
+	return s
+}
+
+// startSignalLoop runs a single background goroutine to listen for ALL partition signals
+func (s *BrokerServer) startSignalLoop() {
+	ctx := context.Background()
+	// Use PSubscribe to catch all partition signals with one connection
+	pubsub := s.redisClient.PSubscribe(ctx, "gmq:signal:*")
+	defer pubsub.Close()
+
+	ch := pubsub.Channel()
+	for msg := range ch {
+		s.listenersMu.RLock()
+		// msg.Channel is the actual channel name like gmq:signal:topic:0
+		if nodeListeners, ok := s.listeners[msg.Channel]; ok {
+			for listener := range nodeListeners {
+				select {
+				case listener <- struct{}{}:
+				default:
+					// Listener is busy, skip to avoid blocking the hub
+				}
+			}
+		}
+		s.listenersMu.RUnlock()
+	}
 }
 
 func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 	ctx := stream.Context()
-	// Session 级状态，一旦 Subscribe 成功即固定
+	// Session state, fixed once Subscribe is successful
 	var (
 		sessionConsumerID    string
 		sessionConsumerGroup string
 		sessionTopic         string
+		sessionSignalCh      chan struct{}
+		sessionChannels      []string
 	)
+
+	// Clean up session registration on exit
+	defer func() {
+		if sessionSignalCh != nil {
+			s.unregisterSession(sessionSignalCh, sessionChannels)
+		}
+	}()
 
 	for {
 		msg, err := stream.Recv()
@@ -61,10 +112,14 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 
 		case pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_REQUEST:
 			req := msg.GetSubscribeReq()
-			// Handshake: initialize Session
+
 			sessionConsumerID = req.ConsumerId
 			sessionConsumerGroup = req.ConsumerGroup
 			sessionTopic = req.Topic
+			if sessionSignalCh == nil {
+				sessionSignalCh = make(chan struct{}, 100) // Large buffer to avoid drops
+			}
+
 			s.handleSubscribe(ctx, stream, req)
 
 		case pb.MessageType_MESSAGE_TYPE_ACK_REQUEST:
@@ -80,8 +135,8 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 
 		case pb.MessageType_MESSAGE_TYPE_PULL_REQUEST:
 			req := msg.GetPullReq()
-			// Since sessions are initialized and proto is cleaned up, use session params
-			s.handlePull(ctx, stream, sessionConsumerID, sessionConsumerGroup, sessionTopic, req.Limit)
+			// Use the persistent session signal channel
+			s.handlePull(ctx, stream, sessionConsumerID, sessionConsumerGroup, sessionTopic, req.Limit, sessionSignalCh)
 
 		case pb.MessageType_MESSAGE_TYPE_HEARTBEAT_REQUEST:
 			req := msg.GetHeartbeatReq()
@@ -97,7 +152,48 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 	}
 }
 
-func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group, topic string, limit int32) {
+func (s *BrokerServer) registerSession(ch chan struct{}, channels []string) {
+	s.listenersMu.Lock()
+	defer s.listenersMu.Unlock()
+	for _, c := range channels {
+		if s.listeners[c] == nil {
+			s.listeners[c] = make(map[chan struct{}]struct{})
+		}
+		s.listeners[c][ch] = struct{}{}
+	}
+}
+
+func (s *BrokerServer) unregisterSession(ch chan struct{}, channels []string) {
+	s.listenersMu.Lock()
+	defer s.listenersMu.Unlock()
+	for _, c := range channels {
+		if s.listeners[c] != nil {
+			delete(s.listeners[c], ch)
+			if len(s.listeners[c]) == 0 {
+				delete(s.listeners, c)
+			}
+		}
+	}
+}
+
+func (s *BrokerServer) getConsumerChannels(ctx context.Context, group, topic, consumerID string) []string {
+	assignResp, err := s.storageClient.GetGroupAssignment(ctx, &storagepb.GetGroupAssignmentRequest{
+		ConsumerGroup: group, Topic: topic,
+	})
+	if err != nil || !assignResp.Success {
+		return nil
+	}
+
+	var channels []string
+	for partID, assignedID := range assignResp.PartitionAssignment {
+		if assignedID == consumerID {
+			channels = append(channels, fmt.Sprintf("gmq:signal:%s:%d", topic, partID))
+		}
+	}
+	return channels
+}
+
+func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group, topic string, limit int32, signalCh chan struct{}) {
 	if consumerID == "" || group == "" || topic == "" {
 		return
 	}
@@ -110,70 +206,87 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 	}
 
 	var myPartitions []int32
+	var currentChannels []string
 	for partID, assignedID := range assignResp.PartitionAssignment {
 		if assignedID == consumerID {
 			myPartitions = append(myPartitions, partID)
+			currentChannels = append(currentChannels, fmt.Sprintf("gmq:signal:%s:%d", topic, partID))
 		}
 	}
 
 	if len(myPartitions) == 0 {
+		// If no partitions assigned yet, wait a bit and return
+		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
-	// Wait up to 2 seconds for data
-	timeout := time.After(2 * time.Second)
-	for {
-		var allItems []*pb.MessageItem
-		for _, partID := range myPartitions {
-			// Each FetchMessages already has a small block (e.g. 200ms) in Redis
-			resp, err := s.storageClient.FetchMessages(ctx, &storagepb.FetchMessagesRequest{
-				Topic:         topic,
-				PartitionId:   partID,
-				ConsumerGroup: group,
-				ConsumerId:    consumerID,
-				Limit:         limit,
-			})
+	// Register current partitions to receive signals
+	s.registerSession(signalCh, currentChannels)
+	defer s.unregisterSession(signalCh, currentChannels)
 
-			if err != nil || resp == nil || len(resp.Messages) == 0 {
-				continue
-			}
-
+	// Try regular fetch
+	var allItems []*pb.MessageItem
+	for _, partID := range myPartitions {
+		resp, err := s.storageClient.FetchMessages(ctx, &storagepb.FetchMessagesRequest{
+			Topic:         topic,
+			PartitionId:   partID,
+			ConsumerGroup: group,
+			ConsumerId:    consumerID,
+			Limit:         limit,
+		})
+		if err == nil && resp != nil && len(resp.Messages) > 0 {
 			for _, m := range resp.Messages {
 				allItems = append(allItems, &pb.MessageItem{
-					MessageId:   m.Id,
 					Topic:       m.Topic,
 					PartitionId: m.PartitionId,
 					Offset:      m.Offset,
 					Payload:     m.Payload,
-					Properties:  m.Properties,
-					Timestamp:   m.Timestamp,
-					Key:         m.Key,
 				})
 			}
 		}
+	}
 
-		if len(allItems) > 0 {
-			if err := stream.Send(&pb.StreamMessage{
-				Type: pb.MessageType_MESSAGE_TYPE_CONSUME_MESSAGE,
-				Payload: &pb.StreamMessage_ConsumeMsg{
-					ConsumeMsg: &pb.ConsumeMessage{Items: allItems},
-				},
-			}); err != nil {
-				log.WithContext(ctx).Error("Failed to push consumed messages", "error", err)
+	if len(allItems) > 0 {
+		s.sendConsumeMessage(stream, allItems)
+		return
+	}
+
+	// Try XCLAIM
+	for _, partID := range myPartitions {
+		claimResp, _ := s.storageClient.ClaimMessages(ctx, &storagepb.ClaimMessagesRequest{
+			Topic: topic, PartitionId: partID, ConsumerGroup: group, ConsumerId: consumerID, MinIdleTimeMs: 10000, Limit: limit,
+		})
+		if claimResp != nil && len(claimResp.Messages) > 0 {
+			var items []*pb.MessageItem
+			for _, m := range claimResp.Messages {
+				items = append(items, &pb.MessageItem{
+					Topic:       m.Topic,
+					PartitionId: m.PartitionId,
+					Offset:      m.Offset,
+					Payload:     m.Payload,
+				})
 			}
+			s.sendConsumeMessage(stream, items)
 			return
-		}
-
-		select {
-		case <-timeout:
-			return
-		case <-ctx.Done():
-			return
-		default:
-			// If no partitions have data, yield momentarily
-			time.Sleep(10 * time.Millisecond)
 		}
 	}
+
+	// Block until a signal arrives or short timeout
+	// Shortening timeout to 1s to keep the stream responsive to other requests (Acks, etc.)
+	select {
+	case <-signalCh:
+	case <-ctx.Done():
+	case <-time.After(1 * time.Second):
+	}
+}
+
+func (s *BrokerServer) sendConsumeMessage(stream pb.GMQService_StreamServer, items []*pb.MessageItem) {
+	stream.Send(&pb.StreamMessage{
+		Type: pb.MessageType_MESSAGE_TYPE_CONSUME_MESSAGE,
+		Payload: &pb.StreamMessage_ConsumeMsg{
+			ConsumeMsg: &pb.ConsumeMessage{Items: items},
+		},
+	})
 }
 
 func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group string, req *pb.AckRequest) {
@@ -227,14 +340,9 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 		}
 
 		storageMsgs[i] = &storagepb.Message{
-			Id:             msgID,
-			Topic:          item.Topic,
-			PartitionId:    partID,
-			Payload:        item.Payload,
-			Timestamp:      time.Now().Unix(),
-			Key:            item.PartitionKey,
-			ProducerId:     item.ProducerId,
-			SequenceNumber: item.SequenceNumber,
+			Topic:       item.Topic,
+			PartitionId: partID,
+			Payload:     item.Payload,
 		}
 		results[i] = &pb.PublishResult{
 			MessageId:   msgID,
@@ -328,7 +436,9 @@ func main() {
 	conn, _ := grpc.Dial(*storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	storage := storagepb.NewStorageServiceClient(conn)
 	srv := grpc.NewServer()
-	pb.RegisterGMQServiceServer(srv, NewBrokerServer(storage, int32(*defaultPartitions)))
+	// Pass Redis address for pub/sub notifications
+	brokerServer := NewBrokerServer(storage, int32(*defaultPartitions), "localhost:6379")
+	pb.RegisterGMQServiceServer(srv, brokerServer)
 	l, _ := net.Listen("tcp", *addr)
 	log.Info("Broker started", "addr", *addr)
 	go srv.Serve(l)

@@ -7,17 +7,10 @@ import (
 
 // Message structure (internal use)
 type Message struct {
-	ID             string            `json:"id"`
-	Topic          string            `json:"topic"`
-	PartitionID    int32             `json:"partition_id"`
-	Offset         int64             `json:"offset"`
-	Payload        []byte            `json:"payload"`
-	Properties     map[string]string `json:"properties"`
-	Timestamp      int64             `json:"timestamp"`
-	ExpiresAt      int64             `json:"expires_at,omitempty"`
-	ProducerID     string            `json:"producer_id,omitempty"`
-	SequenceNumber int64             `json:"sequence_number,omitempty"`
-	Key            string            `json:"key,omitempty"`
+	Topic       string `json:"topic"`
+	PartitionID int32  `json:"partition_id"`
+	Offset      int64  `json:"offset"`
+	Payload     []byte `json:"payload"`
 }
 
 // Partition structure
@@ -50,6 +43,7 @@ type Storage interface {
 	// --- Consumer Group operations ---
 	FetchMessages(ctx context.Context, consumerGroup, topic string, consumerID string, partitionID int32, limit int) ([]*Message, error)
 	AcknowledgeMessages(ctx context.Context, consumerGroup, topic string, partitionID int32, offsets []int64) (int64, error)
+	ClaimMessages(ctx context.Context, consumerGroup, topic, consumerID string, partitionID int32, minIdleTime time.Duration, limit int) ([]*Message, error)
 
 	// --- TTL management ---
 	SetTTL(ctx context.Context, topic string, ttl time.Duration) error

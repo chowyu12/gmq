@@ -40,15 +40,9 @@ func (s *StorageServer) WriteMessages(ctx context.Context, req *pb.WriteMessages
 	internalMsgs := make([]*storage.Message, len(req.Messages))
 	for i, msg := range req.Messages {
 		internalMsgs[i] = &storage.Message{
-			ID:             msg.Id,
-			Topic:          msg.Topic,
-			PartitionID:    msg.PartitionId,
-			Payload:        msg.Payload,
-			Properties:     msg.Properties,
-			Timestamp:      msg.Timestamp,
-			ProducerID:     msg.ProducerId,
-			SequenceNumber: msg.SequenceNumber,
-			Key:            msg.Key,
+			Topic:       msg.Topic,
+			PartitionID: msg.PartitionId,
+			Payload:     msg.Payload,
 		}
 	}
 
@@ -95,16 +89,10 @@ func (s *StorageServer) FetchMessages(ctx context.Context, req *pb.FetchMessages
 	pbMessages := make([]*pb.Message, len(messages))
 	for i, msg := range messages {
 		pbMessages[i] = &pb.Message{
-			Id:             msg.ID,
-			Topic:          msg.Topic,
-			PartitionId:    msg.PartitionID,
-			Offset:         msg.Offset,
-			Payload:        msg.Payload,
-			Properties:     msg.Properties,
-			Timestamp:      msg.Timestamp,
-			ProducerId:     msg.ProducerID,
-			SequenceNumber: msg.SequenceNumber,
-			Key:            msg.Key,
+			Topic:       msg.Topic,
+			PartitionId: msg.PartitionID,
+			Offset:      msg.Offset,
+			Payload:     msg.Payload,
 		}
 	}
 
@@ -117,6 +105,25 @@ func (s *StorageServer) AcknowledgeMessages(ctx context.Context, req *pb.Acknowl
 		return &pb.AcknowledgeMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
 	return &pb.AcknowledgeMessagesResponse{Success: true, Count: count}, nil
+}
+
+func (s *StorageServer) ClaimMessages(ctx context.Context, req *pb.ClaimMessagesRequest) (*pb.ClaimMessagesResponse, error) {
+	messages, err := s.store.ClaimMessages(ctx, req.ConsumerGroup, req.Topic, req.ConsumerId, req.PartitionId, time.Duration(req.MinIdleTimeMs)*time.Millisecond, int(req.Limit))
+	if err != nil {
+		return &pb.ClaimMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
+	}
+
+	pbMessages := make([]*pb.Message, len(messages))
+	for i, msg := range messages {
+		pbMessages[i] = &pb.Message{
+			Topic:       msg.Topic,
+			PartitionId: msg.PartitionID,
+			Offset:      msg.Offset,
+			Payload:     msg.Payload,
+		}
+	}
+
+	return &pb.ClaimMessagesResponse{Messages: pbMessages, Success: true}, nil
 }
 
 func (s *StorageServer) ListPartitions(ctx context.Context, req *pb.ListPartitionsRequest) (*pb.ListPartitionsResponse, error) {
@@ -143,8 +150,6 @@ func (s *StorageServer) SetTTL(ctx context.Context, req *pb.SetTTLRequest) (*pb.
 	}
 	return &pb.SetTTLResponse{Success: true}, nil
 }
-
-// --- State management interface implementation ---
 
 // --- State management interface implementation ---
 

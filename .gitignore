@@ -20,3 +20,4 @@ Thumbs.db
 bin/
 storage-data/
 data/
+cmd/broker-service/main.go
