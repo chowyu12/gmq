@@ -176,23 +176,6 @@ func (s *BrokerServer) unregisterSession(ch chan struct{}, channels []string) {
 	}
 }
 
-func (s *BrokerServer) getConsumerChannels(ctx context.Context, group, topic, consumerID string) []string {
-	assignResp, err := s.storageClient.GetGroupAssignment(ctx, &storagepb.GetGroupAssignmentRequest{
-		ConsumerGroup: group, Topic: topic,
-	})
-	if err != nil || !assignResp.Success {
-		return nil
-	}
-
-	var channels []string
-	for partID, assignedID := range assignResp.PartitionAssignment {
-		if assignedID == consumerID {
-			channels = append(channels, fmt.Sprintf("gmq:signal:%s:%d", topic, partID))
-		}
-	}
-	return channels
-}
-
 func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group, topic string, limit int32, signalCh chan struct{}) {
 	if consumerID == "" || group == "" || topic == "" {
 		return
