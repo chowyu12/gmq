@@ -133,92 +133,6 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 	return offsets, nil
 }
 
-func (r *RedisStorage) ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error) {
-	key := r.streamKey(topic, partitionID)
-
-	// Redis Stream ID format is "timestamp-sequence"
-	// If offset == 0, we start reading from the smallest ID "-"
-	// If offset > 0, we need to read after that ID, so use "(" + ID syntax
-	startID := decodeOffset(offset)
-	if offset > 0 {
-		startID = "(" + startID // Exclude current offset, read next message
-	}
-
-	res, err := r.client.XRangeN(ctx, key, startID, "+", int64(limit)).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	var messages []*Message
-	for _, xmsg := range res {
-		var msg Message
-		if data, ok := xmsg.Values["data"].(string); ok {
-			json.Unmarshal([]byte(data), &msg)
-			// Use encoded full ID as Offset returned to client
-			msg.Offset = encodeOffset(xmsg.ID)
-			messages = append(messages, &msg)
-		}
-	}
-	return messages, nil
-}
-
-func (r *RedisStorage) CreatePartition(ctx context.Context, topic string, partitionID int32) error {
-	// Redis Stream is automatically created on first XADD, here we can do some metadata recording
-	key := fmt.Sprintf("gmq:meta:partitions:%s", topic)
-	return r.client.SAdd(ctx, key, partitionID).Err()
-}
-
-func (r *RedisStorage) ListPartitions(ctx context.Context, topic string) ([]*Partition, error) {
-	key := fmt.Sprintf("gmq:meta:partitions:%s", topic)
-	pids, err := r.client.SMembers(ctx, key).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	var partitions []*Partition
-	for _, pidStr := range pids {
-		pid, _ := strconv.ParseInt(pidStr, 10, 32)
-		partitions = append(partitions, &Partition{
-			ID:    int32(pid),
-			Topic: topic,
-		})
-	}
-	return partitions, nil
-}
-
-func (r *RedisStorage) GetPartition(ctx context.Context, topic string, partitionID int32) (*Partition, error) {
-	key := r.streamKey(topic, partitionID)
-	info, err := r.client.XInfoStream(ctx, key).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	return &Partition{
-		ID:           partitionID,
-		Topic:        topic,
-		MessageCount: info.Length,
-	}, nil
-}
-
-// --- Offset management ---
-
-func (r *RedisStorage) UpdateOffset(ctx context.Context, group, topic string, partitionID int32, offset int64) error {
-	key := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
-	return r.client.HSet(ctx, key, strconv.Itoa(int(partitionID)), offset).Err()
-}
-
-func (r *RedisStorage) GetOffset(ctx context.Context, group, topic string, partitionID int32) (int64, error) {
-	key := fmt.Sprintf("gmq:offsets:%s:%s", group, topic)
-	val, err := r.client.HGet(ctx, key, strconv.Itoa(int(partitionID))).Result()
-	if err == redis.Nil {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseInt(val, 10, 64)
-}
-
 // FetchMessages reads messages using XREADGROUP command.
 // It automatically manages consumer group creation and utilizes Redis kernel for consumption progress.
 func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, consumerID string, partitionID int32, limit int) ([]*Message, error) {
@@ -305,6 +219,44 @@ func (r *RedisStorage) SetTTL(ctx context.Context, topic string, ttl time.Durati
 	// Here we record metadata, actual cleanup can be done automatically via MAXLEN during writes
 	key := fmt.Sprintf("gmq:meta:ttl:%s", topic)
 	return r.client.Set(ctx, key, ttl.Seconds(), 0).Err()
+}
+
+func (r *RedisStorage) CreatePartition(ctx context.Context, topic string, partitionID int32) error {
+	// Redis Stream is automatically created on first XADD, here we can do some metadata recording
+	key := fmt.Sprintf("gmq:meta:partitions:%s", topic)
+	return r.client.SAdd(ctx, key, partitionID).Err()
+}
+
+func (r *RedisStorage) ListPartitions(ctx context.Context, topic string) ([]*Partition, error) {
+	key := fmt.Sprintf("gmq:meta:partitions:%s", topic)
+	pids, err := r.client.SMembers(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var partitions []*Partition
+	for _, pidStr := range pids {
+		pid, _ := strconv.ParseInt(pidStr, 10, 32)
+		partitions = append(partitions, &Partition{
+			ID:    int32(pid),
+			Topic: topic,
+		})
+	}
+	return partitions, nil
+}
+
+func (r *RedisStorage) GetPartition(ctx context.Context, topic string, partitionID int32) (*Partition, error) {
+	key := r.streamKey(topic, partitionID)
+	info, err := r.client.XInfoStream(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Partition{
+		ID:           partitionID,
+		Topic:        topic,
+		MessageCount: info.Length,
+	}, nil
 }
 
 // --- State management ---

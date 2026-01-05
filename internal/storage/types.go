@@ -43,20 +43,17 @@ type ConsumerState struct {
 type Storage interface {
 	// --- Message operations ---
 	WriteMessages(ctx context.Context, msgs []*Message) ([]int64, error)
-	ReadMessages(ctx context.Context, topic string, partitionID int32, offset int64, limit int) ([]*Message, error)
 	CreatePartition(ctx context.Context, topic string, partitionID int32) error
 	GetPartition(ctx context.Context, topic string, partitionID int32) (*Partition, error)
 	ListPartitions(ctx context.Context, topic string) ([]*Partition, error)
-	
-	// --- Offset management ---
-	UpdateOffset(ctx context.Context, consumerGroup, topic string, partitionID int32, offset int64) error
-	GetOffset(ctx context.Context, consumerGroup, topic string, partitionID int32) (int64, error)
+
+	// --- Consumer Group operations ---
 	FetchMessages(ctx context.Context, consumerGroup, topic string, consumerID string, partitionID int32, limit int) ([]*Message, error)
 	AcknowledgeMessages(ctx context.Context, consumerGroup, topic string, partitionID int32, offsets []int64) (int64, error)
-	
+
 	// --- TTL management ---
 	SetTTL(ctx context.Context, topic string, ttl time.Duration) error
-	
+
 	// --- State management ---
 	SaveConsumer(ctx context.Context, state *ConsumerState) error
 	GetConsumers(ctx context.Context, group, topic string) ([]*ConsumerState, error)
