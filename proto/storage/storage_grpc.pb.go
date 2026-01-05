@@ -20,11 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	StorageService_WriteMessages_FullMethodName         = "/storage.StorageService/WriteMessages"
-	StorageService_ReadMessages_FullMethodName          = "/storage.StorageService/ReadMessages"
 	StorageService_CreatePartition_FullMethodName       = "/storage.StorageService/CreatePartition"
 	StorageService_GetPartition_FullMethodName          = "/storage.StorageService/GetPartition"
-	StorageService_UpdateOffset_FullMethodName          = "/storage.StorageService/UpdateOffset"
-	StorageService_GetOffset_FullMethodName             = "/storage.StorageService/GetOffset"
 	StorageService_ListPartitions_FullMethodName        = "/storage.StorageService/ListPartitions"
 	StorageService_SetTTL_FullMethodName                = "/storage.StorageService/SetTTL"
 	StorageService_SaveConsumer_FullMethodName          = "/storage.StorageService/SaveConsumer"
@@ -34,6 +31,7 @@ const (
 	StorageService_GetGroupAssignment_FullMethodName    = "/storage.StorageService/GetGroupAssignment"
 	StorageService_FetchMessages_FullMethodName         = "/storage.StorageService/FetchMessages"
 	StorageService_AcknowledgeMessages_FullMethodName   = "/storage.StorageService/AcknowledgeMessages"
+	StorageService_ClaimMessages_FullMethodName         = "/storage.StorageService/ClaimMessages"
 )
 
 // StorageServiceClient is the client API for StorageService service.
@@ -44,11 +42,8 @@ const (
 type StorageServiceClient interface {
 	// --- Message interface ---
 	WriteMessages(ctx context.Context, in *WriteMessagesRequest, opts ...grpc.CallOption) (*WriteMessagesResponse, error)
-	ReadMessages(ctx context.Context, in *ReadMessagesRequest, opts ...grpc.CallOption) (*ReadMessagesResponse, error)
 	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
 	GetPartition(ctx context.Context, in *GetPartitionRequest, opts ...grpc.CallOption) (*GetPartitionResponse, error)
-	UpdateOffset(ctx context.Context, in *UpdateOffsetRequest, opts ...grpc.CallOption) (*UpdateOffsetResponse, error)
-	GetOffset(ctx context.Context, in *GetOffsetRequest, opts ...grpc.CallOption) (*GetOffsetResponse, error)
 	ListPartitions(ctx context.Context, in *ListPartitionsRequest, opts ...grpc.CallOption) (*ListPartitionsResponse, error)
 	SetTTL(ctx context.Context, in *SetTTLRequest, opts ...grpc.CallOption) (*SetTTLResponse, error)
 	// Save/update consumer information
@@ -61,10 +56,12 @@ type StorageServiceClient interface {
 	UpdateGroupAssignment(ctx context.Context, in *UpdateGroupAssignmentRequest, opts ...grpc.CallOption) (*UpdateGroupAssignmentResponse, error)
 	// Get consumer group assignment information
 	GetGroupAssignment(ctx context.Context, in *GetGroupAssignmentRequest, opts ...grpc.CallOption) (*GetGroupAssignmentResponse, error)
-	// Atomic fetch: 使用 Redis Consumer Group 语义读取消息
+	// Atomic fetch: reads messages using Redis Consumer Group semantics
 	FetchMessages(ctx context.Context, in *FetchMessagesRequest, opts ...grpc.CallOption) (*FetchMessagesResponse, error)
-	// 确认消息已处理 (XACK)
+	// Acknowledge processed messages (XACK)
 	AcknowledgeMessages(ctx context.Context, in *AcknowledgeMessagesRequest, opts ...grpc.CallOption) (*AcknowledgeMessagesResponse, error)
+	// Claim timed-out pending messages (XCLAIM)
+	ClaimMessages(ctx context.Context, in *ClaimMessagesRequest, opts ...grpc.CallOption) (*ClaimMessagesResponse, error)
 }
 
 type storageServiceClient struct {
@@ -85,16 +82,6 @@ func (c *storageServiceClient) WriteMessages(ctx context.Context, in *WriteMessa
 	return out, nil
 }
 
-func (c *storageServiceClient) ReadMessages(ctx context.Context, in *ReadMessagesRequest, opts ...grpc.CallOption) (*ReadMessagesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ReadMessagesResponse)
-	err := c.cc.Invoke(ctx, StorageService_ReadMessages_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *storageServiceClient) CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreatePartitionResponse)
@@ -109,26 +96,6 @@ func (c *storageServiceClient) GetPartition(ctx context.Context, in *GetPartitio
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetPartitionResponse)
 	err := c.cc.Invoke(ctx, StorageService_GetPartition_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *storageServiceClient) UpdateOffset(ctx context.Context, in *UpdateOffsetRequest, opts ...grpc.CallOption) (*UpdateOffsetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateOffsetResponse)
-	err := c.cc.Invoke(ctx, StorageService_UpdateOffset_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *storageServiceClient) GetOffset(ctx context.Context, in *GetOffsetRequest, opts ...grpc.CallOption) (*GetOffsetResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetOffsetResponse)
-	err := c.cc.Invoke(ctx, StorageService_GetOffset_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +192,16 @@ func (c *storageServiceClient) AcknowledgeMessages(ctx context.Context, in *Ackn
 	return out, nil
 }
 
+func (c *storageServiceClient) ClaimMessages(ctx context.Context, in *ClaimMessagesRequest, opts ...grpc.CallOption) (*ClaimMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimMessagesResponse)
+	err := c.cc.Invoke(ctx, StorageService_ClaimMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServiceServer is the server API for StorageService service.
 // All implementations must embed UnimplementedStorageServiceServer
 // for forward compatibility.
@@ -233,11 +210,8 @@ func (c *storageServiceClient) AcknowledgeMessages(ctx context.Context, in *Ackn
 type StorageServiceServer interface {
 	// --- Message interface ---
 	WriteMessages(context.Context, *WriteMessagesRequest) (*WriteMessagesResponse, error)
-	ReadMessages(context.Context, *ReadMessagesRequest) (*ReadMessagesResponse, error)
 	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
 	GetPartition(context.Context, *GetPartitionRequest) (*GetPartitionResponse, error)
-	UpdateOffset(context.Context, *UpdateOffsetRequest) (*UpdateOffsetResponse, error)
-	GetOffset(context.Context, *GetOffsetRequest) (*GetOffsetResponse, error)
 	ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error)
 	SetTTL(context.Context, *SetTTLRequest) (*SetTTLResponse, error)
 	// Save/update consumer information
@@ -250,10 +224,12 @@ type StorageServiceServer interface {
 	UpdateGroupAssignment(context.Context, *UpdateGroupAssignmentRequest) (*UpdateGroupAssignmentResponse, error)
 	// Get consumer group assignment information
 	GetGroupAssignment(context.Context, *GetGroupAssignmentRequest) (*GetGroupAssignmentResponse, error)
-	// Atomic fetch: 使用 Redis Consumer Group 语义读取消息
+	// Atomic fetch: reads messages using Redis Consumer Group semantics
 	FetchMessages(context.Context, *FetchMessagesRequest) (*FetchMessagesResponse, error)
-	// 确认消息已处理 (XACK)
+	// Acknowledge processed messages (XACK)
 	AcknowledgeMessages(context.Context, *AcknowledgeMessagesRequest) (*AcknowledgeMessagesResponse, error)
+	// Claim timed-out pending messages (XCLAIM)
+	ClaimMessages(context.Context, *ClaimMessagesRequest) (*ClaimMessagesResponse, error)
 	mustEmbedUnimplementedStorageServiceServer()
 }
 
@@ -267,20 +243,11 @@ type UnimplementedStorageServiceServer struct{}
 func (UnimplementedStorageServiceServer) WriteMessages(context.Context, *WriteMessagesRequest) (*WriteMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteMessages not implemented")
 }
-func (UnimplementedStorageServiceServer) ReadMessages(context.Context, *ReadMessagesRequest) (*ReadMessagesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReadMessages not implemented")
-}
 func (UnimplementedStorageServiceServer) CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreatePartition not implemented")
 }
 func (UnimplementedStorageServiceServer) GetPartition(context.Context, *GetPartitionRequest) (*GetPartitionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPartition not implemented")
-}
-func (UnimplementedStorageServiceServer) UpdateOffset(context.Context, *UpdateOffsetRequest) (*UpdateOffsetResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateOffset not implemented")
-}
-func (UnimplementedStorageServiceServer) GetOffset(context.Context, *GetOffsetRequest) (*GetOffsetResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetOffset not implemented")
 }
 func (UnimplementedStorageServiceServer) ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPartitions not implemented")
@@ -308,6 +275,9 @@ func (UnimplementedStorageServiceServer) FetchMessages(context.Context, *FetchMe
 }
 func (UnimplementedStorageServiceServer) AcknowledgeMessages(context.Context, *AcknowledgeMessagesRequest) (*AcknowledgeMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeMessages not implemented")
+}
+func (UnimplementedStorageServiceServer) ClaimMessages(context.Context, *ClaimMessagesRequest) (*ClaimMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClaimMessages not implemented")
 }
 func (UnimplementedStorageServiceServer) mustEmbedUnimplementedStorageServiceServer() {}
 func (UnimplementedStorageServiceServer) testEmbeddedByValue()                        {}
@@ -348,24 +318,6 @@ func _StorageService_WriteMessages_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _StorageService_ReadMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadMessagesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StorageServiceServer).ReadMessages(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: StorageService_ReadMessages_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServiceServer).ReadMessages(ctx, req.(*ReadMessagesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _StorageService_CreatePartition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreatePartitionRequest)
 	if err := dec(in); err != nil {
@@ -398,42 +350,6 @@ func _StorageService_GetPartition_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(StorageServiceServer).GetPartition(ctx, req.(*GetPartitionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _StorageService_UpdateOffset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateOffsetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StorageServiceServer).UpdateOffset(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: StorageService_UpdateOffset_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServiceServer).UpdateOffset(ctx, req.(*UpdateOffsetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _StorageService_GetOffset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetOffsetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StorageServiceServer).GetOffset(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: StorageService_GetOffset_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServiceServer).GetOffset(ctx, req.(*GetOffsetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -600,6 +516,24 @@ func _StorageService_AcknowledgeMessages_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StorageService_ClaimMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServiceServer).ClaimMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StorageService_ClaimMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServiceServer).ClaimMessages(ctx, req.(*ClaimMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StorageService_ServiceDesc is the grpc.ServiceDesc for StorageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -612,24 +546,12 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _StorageService_WriteMessages_Handler,
 		},
 		{
-			MethodName: "ReadMessages",
-			Handler:    _StorageService_ReadMessages_Handler,
-		},
-		{
 			MethodName: "CreatePartition",
 			Handler:    _StorageService_CreatePartition_Handler,
 		},
 		{
 			MethodName: "GetPartition",
 			Handler:    _StorageService_GetPartition_Handler,
-		},
-		{
-			MethodName: "UpdateOffset",
-			Handler:    _StorageService_UpdateOffset_Handler,
-		},
-		{
-			MethodName: "GetOffset",
-			Handler:    _StorageService_GetOffset_Handler,
 		},
 		{
 			MethodName: "ListPartitions",
@@ -666,6 +588,10 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AcknowledgeMessages",
 			Handler:    _StorageService_AcknowledgeMessages_Handler,
+		},
+		{
+			MethodName: "ClaimMessages",
+			Handler:    _StorageService_ClaimMessages_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
