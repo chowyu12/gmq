@@ -157,12 +157,13 @@ func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, c
 
 	// 2. Read messages using XREADGROUP
 	// ">" indicates reading messages never delivered to other consumers
+	// Using a small block time to improve responsiveness and reduce CPU spin
 	streams, err := r.client.XReadGroup(ctx, &redis.XReadGroupArgs{
 		Group:    group,
 		Consumer: consumerID,
 		Streams:  []string{key, ">"},
 		Count:    int64(limit),
-		Block:    0, // Non-blocking read
+		Block:    200 * time.Millisecond,
 	}).Result()
 
 	if err == redis.Nil {

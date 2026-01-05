@@ -120,10 +120,12 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 		return
 	}
 
-	timeout := time.After(1 * time.Second)
+	// Wait up to 2 seconds for data
+	timeout := time.After(2 * time.Second)
 	for {
 		var allItems []*pb.MessageItem
 		for _, partID := range myPartitions {
+			// Each FetchMessages already has a small block (e.g. 200ms) in Redis
 			resp, err := s.storageClient.FetchMessages(ctx, &storagepb.FetchMessagesRequest{
 				Topic:         topic,
 				PartitionId:   partID,
@@ -132,29 +134,33 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 				Limit:         limit,
 			})
 
-			if err == nil && len(resp.Messages) > 0 {
-				for _, m := range resp.Messages {
-					allItems = append(allItems, &pb.MessageItem{
-						MessageId:   m.Id,
-						Topic:       m.Topic,
-						PartitionId: m.PartitionId,
-						Offset:      m.Offset,
-						Payload:     m.Payload,
-						Properties:  m.Properties,
-						Timestamp:   m.Timestamp,
-						Key:         m.Key,
-					})
-				}
+			if err != nil || resp == nil || len(resp.Messages) == 0 {
+				continue
+			}
+
+			for _, m := range resp.Messages {
+				allItems = append(allItems, &pb.MessageItem{
+					MessageId:   m.Id,
+					Topic:       m.Topic,
+					PartitionId: m.PartitionId,
+					Offset:      m.Offset,
+					Payload:     m.Payload,
+					Properties:  m.Properties,
+					Timestamp:   m.Timestamp,
+					Key:         m.Key,
+				})
 			}
 		}
 
 		if len(allItems) > 0 {
-			stream.Send(&pb.StreamMessage{
+			if err := stream.Send(&pb.StreamMessage{
 				Type: pb.MessageType_MESSAGE_TYPE_CONSUME_MESSAGE,
 				Payload: &pb.StreamMessage_ConsumeMsg{
 					ConsumeMsg: &pb.ConsumeMessage{Items: allItems},
 				},
-			})
+			}); err != nil {
+				log.WithContext(ctx).Error("Failed to push consumed messages", "error", err)
+			}
 			return
 		}
 
@@ -163,8 +169,9 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 			return
 		case <-ctx.Done():
 			return
-		case <-time.After(20 * time.Millisecond):
-			continue
+		default:
+			// If no partitions have data, yield momentarily
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
