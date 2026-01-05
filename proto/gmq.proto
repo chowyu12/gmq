@@ -202,8 +202,6 @@ message ErrorResponse {
 
 // Client-initiated pull message request
 message PullRequest {
-  string consumer_id = 1;
-  string consumer_group = 2;
-  string topic = 3;
+  reserved 1, 2, 3;
   int32 limit = 4;
 }

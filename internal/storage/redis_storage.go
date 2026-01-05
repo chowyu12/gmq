@@ -22,7 +22,7 @@ func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error
 		Addr:     addr,
 		Password: password,
 		DB:       db,
-		// Force RESP2 protocol because DragonflyDB does not support some RESP3 
+		// Force RESP2 protocol because DragonflyDB does not support some RESP3
 		// maintenance subcommands (like CLIENT MAINT_NOTIFICATIONS) yet.
 		Protocol: 2,
 	})
@@ -219,11 +219,10 @@ func (r *RedisStorage) GetOffset(ctx context.Context, group, topic string, parti
 	return strconv.ParseInt(val, 10, 64)
 }
 
-// FetchMessages atomically reads and updates offset, then reads messages.
-// It uses a distributed lock to prevent concurrent pulls on the same partition,
-// eliminating race conditions and avoiding Lua memory limits.
-func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, partitionID int32, limit int) ([]*Message, error) {
-	// Limit batch size to prevent excessive memory usage in Go layer
+// FetchMessages reads messages using XREADGROUP command.
+// It automatically manages consumer group creation and utilizes Redis kernel for consumption progress.
+func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, consumerID string, partitionID int32, limit int) ([]*Message, error) {
+	// Limit batch size to prevent excessive memory usage
 	const maxBatchSize = 500
 	if limit > maxBatchSize {
 		limit = maxBatchSize
@@ -232,44 +231,71 @@ func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, p
 		limit = 100
 	}
 
-	// 1. Acquire distributed lock for this specific partition pull
-	// This prevents multiple brokers from pulling the same messages simultaneously.
-	lockKey := fmt.Sprintf("gmq:lock:fetch:%s:%s:%d", group, topic, partitionID)
-	// Lock timeout 5s is plenty for a single batch pull
-	ok, err := r.client.SetNX(ctx, lockKey, "1", 5*time.Second).Result()
-	if err != nil {
-		return nil, err
+	key := r.streamKey(topic, partitionID)
+
+	// 1. Try to create Consumer Group if it doesn't exist
+	// MKSTREAM parameter ensures an empty stream is created if it doesn't exist
+	// "0" indicates consuming from the beginning for new groups
+	err := r.client.XGroupCreateMkStream(ctx, key, group, "0").Err()
+	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
+		return nil, fmt.Errorf("failed to create consumer group: %w", err)
 	}
-	if !ok {
-		// If locked, another broker is currently fetching for this partition.
-		// Return empty to allow the caller to retry or back off.
+
+	// 2. Read messages using XREADGROUP
+	// ">" indicates reading messages never delivered to other consumers
+	streams, err := r.client.XReadGroup(ctx, &redis.XReadGroupArgs{
+		Group:    group,
+		Consumer: consumerID,
+		Streams:  []string{key, ">"},
+		Count:    int64(limit),
+		Block:    0, // Non-blocking read
+	}).Result()
+
+	if err == redis.Nil {
 		return nil, nil
 	}
-	// Ensure lock is released regardless of success or failure
-	defer r.client.Del(ctx, lockKey)
-
-	// 2. Get the current offset from storage
-	currentOffset, err := r.GetOffset(ctx, group, topic, partitionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. Read messages starting from currentOffset + 1
-	msgs, err := r.ReadMessages(ctx, topic, partitionID, currentOffset, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. If messages were found, update the offset immediately
-	if len(msgs) > 0 {
-		lastOffset := msgs[len(msgs)-1].Offset
-		if err := r.UpdateOffset(ctx, group, topic, partitionID, lastOffset); err != nil {
-			// Log error but still return messages; next pull will retry from old offset (at-least-once)
-			log.WithContext(ctx).Error("Failed to update offset after fetch", "group", group, "topic", topic, "error", err)
+	var messages []*Message
+	if len(streams) > 0 {
+		for _, xmsg := range streams[0].Messages {
+			var msg Message
+			if data, ok := xmsg.Values["data"].(string); ok {
+				if err := json.Unmarshal([]byte(data), &msg); err != nil {
+					log.WithContext(ctx).Error("Failed to unmarshal message data", "id", xmsg.ID, "error", err)
+					continue
+				}
+				// Use encoded full ID as Offset returned to client
+				msg.Offset = encodeOffset(xmsg.ID)
+				messages = append(messages, &msg)
+			}
 		}
 	}
 
-	return msgs, nil
+	return messages, nil
+}
+
+// AcknowledgeMessages acknowledges processed messages and removes them from PEL (Pending Entries List).
+func (r *RedisStorage) AcknowledgeMessages(ctx context.Context, group, topic string, partitionID int32, offsets []int64) (int64, error) {
+	if len(offsets) == 0 {
+		return 0, nil
+	}
+
+	key := r.streamKey(topic, partitionID)
+	ids := make([]string, len(offsets))
+	for i, offset := range offsets {
+		ids[i] = decodeOffset(offset)
+	}
+
+	// Execute XACK
+	count, err := r.client.XAck(ctx, key, group, ids...).Result()
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // --- TTL management ---

@@ -30,8 +30,10 @@ type messageContext struct {
 func (m *messageContext) Messages() []*pb.MessageItem { return m.msgs }
 func (m *messageContext) Ack() error                  { return m.consumer.Ack(m.Context, m.msgs) }
 
-type ErrorHandler func(err error)
-type rawMessageHandler func(*pb.ConsumeMessage) error
+type (
+	ErrorHandler      func(err error)
+	rawMessageHandler func(*pb.ConsumeMessage) error
+)
 
 type baseClient struct {
 	conn   *grpc.ClientConn
@@ -188,13 +190,11 @@ func (c *baseClient) heartbeatLoop() {
 			return
 		case <-ticker.C:
 			c.mu.Lock()
+			// Refactor: No longer sending ConsumerId and ConsumerGroup, Broker will retrieve from Session
 			c.stream.Send(&pb.StreamMessage{
 				Type: pb.MessageType_MESSAGE_TYPE_HEARTBEAT_REQUEST,
 				Payload: &pb.StreamMessage_HeartbeatReq{
-					HeartbeatReq: &pb.HeartbeatRequest{
-						ConsumerId:    c.consumerID,
-						ConsumerGroup: c.consumerGroup,
-					},
+					HeartbeatReq: &pb.HeartbeatRequest{},
 				},
 			})
 			c.mu.Unlock()
@@ -251,7 +251,7 @@ func (p *Producer) Publish(ctx context.Context, items []*pb.PublishItem) (*pb.Pu
 	}()
 	p.mu.Lock()
 	p.stream.Send(&pb.StreamMessage{
-		Type: pb.MessageType_MESSAGE_TYPE_PUBLISH_REQUEST,
+		Type:    pb.MessageType_MESSAGE_TYPE_PUBLISH_REQUEST,
 		Payload: &pb.StreamMessage_PublishReq{PublishReq: req},
 	})
 	p.mu.Unlock()
@@ -288,10 +288,18 @@ func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 		return nil, fmt.Errorf("consumer must provide ConsumerGroup configuration")
 	}
 	bc, err := newBaseClient(cfg.ServerAddr, cfg.ErrorHandler)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	bc.consumerGroup = cfg.ConsumerGroup
-	if cfg.ConsumerID == "" { bc.consumerID = "c-" + xid.New().String() } else { bc.consumerID = cfg.ConsumerID }
-	if cfg.PrefetchCount <= 0 { cfg.PrefetchCount = 100 }
+	if cfg.ConsumerID == "" {
+		bc.consumerID = "c-" + xid.New().String()
+	} else {
+		bc.consumerID = cfg.ConsumerID
+	}
+	if cfg.PrefetchCount <= 0 {
+		cfg.PrefetchCount = 100
+	}
 	pullLimit := int32(100)
 	if cfg.PullLimit > 0 {
 		pullLimit = int32(cfg.PullLimit)
@@ -337,12 +345,13 @@ func (c *Consumer) pullDriverLoop() {
 			c.triggerPull()
 			continue
 		}
+		// Refactor: No longer sending consumerID, consumerGroup and topic in every Pull request.
+		// Broker will automatically retrieve these from the Session.
 		pullReq := &pb.StreamMessage{
 			Type: pb.MessageType_MESSAGE_TYPE_PULL_REQUEST,
 			Payload: &pb.StreamMessage_PullReq{
 				PullReq: &pb.PullRequest{
-					ConsumerId: c.consumerID, ConsumerGroup: c.consumerGroup,
-					Topic: c.topic, Limit: c.pullLimit,
+					Limit: c.pullLimit,
 				},
 			},
 		}
@@ -382,7 +391,9 @@ func (c *Consumer) Receive(ctx context.Context, timeout time.Duration) (MessageC
 	case <-c.ctx.Done():
 		return nil, c.ctx.Err()
 	case msg, ok := <-c.msgChan:
-		if !ok { return nil, io.EOF }
+		if !ok {
+			return nil, io.EOF
+		}
 		return &messageContext{Context: c.ctx, msgs: msg.Items, consumer: c}, nil
 	}
 }
@@ -403,7 +414,7 @@ func (c *Consumer) subscribe(ctx context.Context) error {
 	}()
 	c.mu.Lock()
 	c.stream.Send(&pb.StreamMessage{
-		Type: pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_REQUEST,
+		Type:    pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_REQUEST,
 		Payload: &pb.StreamMessage_SubscribeReq{SubscribeReq: req},
 	})
 	c.mu.Unlock()
@@ -421,7 +432,9 @@ func (c *Consumer) subscribe(ctx context.Context) error {
 }
 
 func (c *Consumer) Ack(ctx context.Context, items []*pb.MessageItem) error {
-	if len(items) == 0 { return nil }
+	if len(items) == 0 {
+		return nil
+	}
 	ackItems := make([]*pb.AckItem, len(items))
 	for i, item := range items {
 		ackItems[i] = &pb.AckItem{
@@ -429,13 +442,14 @@ func (c *Consumer) Ack(ctx context.Context, items []*pb.MessageItem) error {
 			MessageId: item.MessageId, Offset: item.Offset,
 		}
 	}
+	// Refactor: No longer sending ConsumerGroup and ConsumerId, Broker will retrieve from Session
 	req := &pb.AckRequest{
-		RequestId: xid.New().String(), ConsumerGroup: c.consumerGroup,
-		ConsumerId: c.consumerID, Items: ackItems,
+		RequestId: xid.New().String(),
+		Items:     ackItems,
 	}
 	c.mu.Lock()
 	err := c.stream.Send(&pb.StreamMessage{
-		Type: pb.MessageType_MESSAGE_TYPE_ACK_REQUEST,
+		Type:    pb.MessageType_MESSAGE_TYPE_ACK_REQUEST,
 		Payload: &pb.StreamMessage_AckReq{AckReq: req},
 	})
 	c.mu.Unlock()
@@ -443,6 +457,15 @@ func (c *Consumer) Ack(ctx context.Context, items []*pb.MessageItem) error {
 }
 
 type PublishOption func(*pb.PublishItem)
-func WithPartitionKey(key string) PublishOption { return func(req *pb.PublishItem) { req.PartitionKey = key } }
-func WithPartitionID(id int32) PublishOption { return func(req *pb.PublishItem) { req.PartitionId = id } }
-func WithProperties(props map[string]string) PublishOption { return func(req *pb.PublishItem) { req.Properties = props } }
+
+func WithPartitionKey(key string) PublishOption {
+	return func(req *pb.PublishItem) { req.PartitionKey = key }
+}
+
+func WithPartitionID(id int32) PublishOption {
+	return func(req *pb.PublishItem) { req.PartitionId = id }
+}
+
+func WithProperties(props map[string]string) PublishOption {
+	return func(req *pb.PublishItem) { req.Properties = props }
+}

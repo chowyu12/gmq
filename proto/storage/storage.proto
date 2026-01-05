@@ -30,21 +30,38 @@ service StorageService {
   // Get consumer group assignment information
   rpc GetGroupAssignment(GetGroupAssignmentRequest) returns (GetGroupAssignmentResponse);
 
-  // Atomic fetch: get current offset -> read messages -> update offset (atomic operation)
+  // Atomic fetch: 使用 Redis Consumer Group 语义读取消息
   rpc FetchMessages(FetchMessagesRequest) returns (FetchMessagesResponse);
+
+  // 确认消息已处理 (XACK)
+  rpc AcknowledgeMessages(AcknowledgeMessagesRequest) returns (AcknowledgeMessagesResponse);
 }
 
 message FetchMessagesRequest {
   string topic = 1;
   int32 partition_id = 2;
   string consumer_group = 3;
-  int32 limit = 4;
+  string consumer_id = 4; // Consumer Group 必须指定消费者 ID
+  int32 limit = 5;
 }
 
 message FetchMessagesResponse {
   bool success = 1;
   string error_message = 2;
   repeated Message messages = 3;
+}
+
+message AcknowledgeMessagesRequest {
+  string topic = 1;
+  int32 partition_id = 2;
+  string consumer_group = 3;
+  repeated int64 offsets = 4; // 需要确认的消息 Offset
+}
+
+message AcknowledgeMessagesResponse {
+  bool success = 1;
+  string error_message = 2;
+  int64 count = 3; // 成功确认的数量
 }
 
 // Message structure

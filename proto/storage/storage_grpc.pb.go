@@ -33,6 +33,7 @@ const (
 	StorageService_UpdateGroupAssignment_FullMethodName = "/storage.StorageService/UpdateGroupAssignment"
 	StorageService_GetGroupAssignment_FullMethodName    = "/storage.StorageService/GetGroupAssignment"
 	StorageService_FetchMessages_FullMethodName         = "/storage.StorageService/FetchMessages"
+	StorageService_AcknowledgeMessages_FullMethodName   = "/storage.StorageService/AcknowledgeMessages"
 )
 
 // StorageServiceClient is the client API for StorageService service.
@@ -60,8 +61,10 @@ type StorageServiceClient interface {
 	UpdateGroupAssignment(ctx context.Context, in *UpdateGroupAssignmentRequest, opts ...grpc.CallOption) (*UpdateGroupAssignmentResponse, error)
 	// Get consumer group assignment information
 	GetGroupAssignment(ctx context.Context, in *GetGroupAssignmentRequest, opts ...grpc.CallOption) (*GetGroupAssignmentResponse, error)
-	// Atomic fetch: get current offset -> read messages -> update offset (atomic operation)
+	// Atomic fetch: 使用 Redis Consumer Group 语义读取消息
 	FetchMessages(ctx context.Context, in *FetchMessagesRequest, opts ...grpc.CallOption) (*FetchMessagesResponse, error)
+	// 确认消息已处理 (XACK)
+	AcknowledgeMessages(ctx context.Context, in *AcknowledgeMessagesRequest, opts ...grpc.CallOption) (*AcknowledgeMessagesResponse, error)
 }
 
 type storageServiceClient struct {
@@ -212,6 +215,16 @@ func (c *storageServiceClient) FetchMessages(ctx context.Context, in *FetchMessa
 	return out, nil
 }
 
+func (c *storageServiceClient) AcknowledgeMessages(ctx context.Context, in *AcknowledgeMessagesRequest, opts ...grpc.CallOption) (*AcknowledgeMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AcknowledgeMessagesResponse)
+	err := c.cc.Invoke(ctx, StorageService_AcknowledgeMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServiceServer is the server API for StorageService service.
 // All implementations must embed UnimplementedStorageServiceServer
 // for forward compatibility.
@@ -237,8 +250,10 @@ type StorageServiceServer interface {
 	UpdateGroupAssignment(context.Context, *UpdateGroupAssignmentRequest) (*UpdateGroupAssignmentResponse, error)
 	// Get consumer group assignment information
 	GetGroupAssignment(context.Context, *GetGroupAssignmentRequest) (*GetGroupAssignmentResponse, error)
-	// Atomic fetch: get current offset -> read messages -> update offset (atomic operation)
+	// Atomic fetch: 使用 Redis Consumer Group 语义读取消息
 	FetchMessages(context.Context, *FetchMessagesRequest) (*FetchMessagesResponse, error)
+	// 确认消息已处理 (XACK)
+	AcknowledgeMessages(context.Context, *AcknowledgeMessagesRequest) (*AcknowledgeMessagesResponse, error)
 	mustEmbedUnimplementedStorageServiceServer()
 }
 
@@ -290,6 +305,9 @@ func (UnimplementedStorageServiceServer) GetGroupAssignment(context.Context, *Ge
 }
 func (UnimplementedStorageServiceServer) FetchMessages(context.Context, *FetchMessagesRequest) (*FetchMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchMessages not implemented")
+}
+func (UnimplementedStorageServiceServer) AcknowledgeMessages(context.Context, *AcknowledgeMessagesRequest) (*AcknowledgeMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeMessages not implemented")
 }
 func (UnimplementedStorageServiceServer) mustEmbedUnimplementedStorageServiceServer() {}
 func (UnimplementedStorageServiceServer) testEmbeddedByValue()                        {}
@@ -564,6 +582,24 @@ func _StorageService_FetchMessages_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StorageService_AcknowledgeMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcknowledgeMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServiceServer).AcknowledgeMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StorageService_AcknowledgeMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServiceServer).AcknowledgeMessages(ctx, req.(*AcknowledgeMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StorageService_ServiceDesc is the grpc.ServiceDesc for StorageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -626,6 +662,10 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchMessages",
 			Handler:    _StorageService_FetchMessages_Handler,
+		},
+		{
+			MethodName: "AcknowledgeMessages",
+			Handler:    _StorageService_AcknowledgeMessages_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

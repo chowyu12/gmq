@@ -39,6 +39,13 @@ func NewBrokerServer(client storagepb.StorageServiceClient, partitions int32) *B
 
 func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 	ctx := stream.Context()
+	// Session 级状态，一旦 Subscribe 成功即固定
+	var (
+		sessionConsumerID    string
+		sessionConsumerGroup string
+		sessionTopic         string
+	)
+
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
@@ -51,21 +58,52 @@ func (s *BrokerServer) Stream(stream pb.GMQService_StreamServer) error {
 		switch msg.Type {
 		case pb.MessageType_MESSAGE_TYPE_PUBLISH_REQUEST:
 			s.handlePublish(ctx, stream, msg.GetPublishReq())
+
 		case pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_REQUEST:
-			s.handleSubscribe(ctx, stream, msg.GetSubscribeReq())
+			req := msg.GetSubscribeReq()
+			// Handshake: initialize Session
+			sessionConsumerID = req.ConsumerId
+			sessionConsumerGroup = req.ConsumerGroup
+			sessionTopic = req.Topic
+			s.handleSubscribe(ctx, stream, req)
+
 		case pb.MessageType_MESSAGE_TYPE_ACK_REQUEST:
-			s.handleAck(ctx, stream, msg.GetAckReq())
+			req := msg.GetAckReq()
+			cid, cgrp := req.ConsumerId, req.ConsumerGroup
+			if cid == "" {
+				cid = sessionConsumerID
+			}
+			if cgrp == "" {
+				cgrp = sessionConsumerGroup
+			}
+			s.handleAck(ctx, stream, cid, cgrp, req)
+
 		case pb.MessageType_MESSAGE_TYPE_PULL_REQUEST:
-			s.handlePull(ctx, stream, msg.GetPullReq())
+			req := msg.GetPullReq()
+			// Since sessions are initialized and proto is cleaned up, use session params
+			s.handlePull(ctx, stream, sessionConsumerID, sessionConsumerGroup, sessionTopic, req.Limit)
+
 		case pb.MessageType_MESSAGE_TYPE_HEARTBEAT_REQUEST:
-			s.handleHeartbeat(ctx, stream, msg.GetHeartbeatReq())
+			req := msg.GetHeartbeatReq()
+			cid, cgrp := req.ConsumerId, req.ConsumerGroup
+			if cid == "" {
+				cid = sessionConsumerID
+			}
+			if cgrp == "" {
+				cgrp = sessionConsumerGroup
+			}
+			s.handleHeartbeat(ctx, stream, cid, cgrp, req)
 		}
 	}
 }
 
-func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.PullRequest) {
+func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group, topic string, limit int32) {
+	if consumerID == "" || group == "" || topic == "" {
+		return
+	}
+
 	assignResp, err := s.storageClient.GetGroupAssignment(ctx, &storagepb.GetGroupAssignmentRequest{
-		ConsumerGroup: req.ConsumerGroup, Topic: req.Topic,
+		ConsumerGroup: group, Topic: topic,
 	})
 	if err != nil || !assignResp.Success {
 		return
@@ -73,7 +111,7 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 
 	var myPartitions []int32
 	for partID, assignedID := range assignResp.PartitionAssignment {
-		if assignedID == req.ConsumerId {
+		if assignedID == consumerID {
 			myPartitions = append(myPartitions, partID)
 		}
 	}
@@ -87,10 +125,11 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 		var allItems []*pb.MessageItem
 		for _, partID := range myPartitions {
 			resp, err := s.storageClient.FetchMessages(ctx, &storagepb.FetchMessagesRequest{
-				Topic:         req.Topic,
+				Topic:         topic,
 				PartitionId:   partID,
-				ConsumerGroup: req.ConsumerGroup,
-				Limit:         req.Limit,
+				ConsumerGroup: group,
+				ConsumerId:    consumerID,
+				Limit:         limit,
 			})
 
 			if err == nil && len(resp.Messages) > 0 {
@@ -130,8 +169,31 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 	}
 }
 
-func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.AckRequest) {
-	// ACK is now optional as FetchMessages updates offset automatically (Read-and-Update)
+func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group string, req *pb.AckRequest) {
+	if consumerID == "" || group == "" {
+		return
+	}
+
+	// Group AckItems by Topic and Partition to call Storage service efficiently
+	ackGroups := make(map[string]map[int32][]int64)
+	for _, item := range req.Items {
+		if _, ok := ackGroups[item.Topic]; !ok {
+			ackGroups[item.Topic] = make(map[int32][]int64)
+		}
+		ackGroups[item.Topic][item.PartitionId] = append(ackGroups[item.Topic][item.PartitionId], item.Offset)
+	}
+
+	for topic, partitions := range ackGroups {
+		for partID, offsets := range partitions {
+			s.storageClient.AcknowledgeMessages(ctx, &storagepb.AcknowledgeMessagesRequest{
+				Topic:         topic,
+				PartitionId:   partID,
+				ConsumerGroup: group,
+				Offsets:       offsets,
+			})
+		}
+	}
+
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_ACK_RESPONSE,
 		Payload: &pb.StreamMessage_AckResp{
@@ -184,6 +246,9 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 }
 
 func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.SubscribeRequest) {
+	if req.ConsumerId == "" || req.ConsumerGroup == "" {
+		return
+	}
 	s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
 		Consumer: &storagepb.ConsumerState{
 			ConsumerId:    req.ConsumerId,
@@ -201,11 +266,14 @@ func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService
 	})
 }
 
-func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService_StreamServer, req *pb.HeartbeatRequest) {
+func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService_StreamServer, consumerID, group string, req *pb.HeartbeatRequest) {
+	if consumerID == "" || group == "" {
+		return
+	}
 	s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
 		Consumer: &storagepb.ConsumerState{
-			ConsumerId:    req.ConsumerId,
-			ConsumerGroup: req.ConsumerGroup,
+			ConsumerId:    consumerID,
+			ConsumerGroup: group,
 			LastHeartbeat: time.Now().Unix(),
 		},
 	})

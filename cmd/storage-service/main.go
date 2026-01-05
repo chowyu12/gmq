@@ -113,6 +113,7 @@ func (s *StorageServer) GetPartition(ctx context.Context, req *pb.GetPartitionRe
 }
 
 func (s *StorageServer) UpdateOffset(ctx context.Context, req *pb.UpdateOffsetRequest) (*pb.UpdateOffsetResponse, error) {
+	// This method is deprecated in favor of AcknowledgeMessages when using Consumer Groups
 	err := s.store.UpdateOffset(ctx, req.ConsumerGroup, req.Topic, req.PartitionId, req.Offset)
 	if err != nil {
 		return &pb.UpdateOffsetResponse{Success: false, ErrorMessage: err.Error()}, nil
@@ -129,7 +130,7 @@ func (s *StorageServer) GetOffset(ctx context.Context, req *pb.GetOffsetRequest)
 }
 
 func (s *StorageServer) FetchMessages(ctx context.Context, req *pb.FetchMessagesRequest) (*pb.FetchMessagesResponse, error) {
-	messages, err := s.store.FetchMessages(ctx, req.ConsumerGroup, req.Topic, req.PartitionId, int(req.Limit))
+	messages, err := s.store.FetchMessages(ctx, req.ConsumerGroup, req.Topic, req.ConsumerId, req.PartitionId, int(req.Limit))
 	if err != nil {
 		return &pb.FetchMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
 	}
@@ -151,6 +152,14 @@ func (s *StorageServer) FetchMessages(ctx context.Context, req *pb.FetchMessages
 	}
 
 	return &pb.FetchMessagesResponse{Messages: pbMessages, Success: true}, nil
+}
+
+func (s *StorageServer) AcknowledgeMessages(ctx context.Context, req *pb.AcknowledgeMessagesRequest) (*pb.AcknowledgeMessagesResponse, error) {
+	count, err := s.store.AcknowledgeMessages(ctx, req.ConsumerGroup, req.Topic, req.PartitionId, req.Offsets)
+	if err != nil {
+		return &pb.AcknowledgeMessagesResponse{Success: false, ErrorMessage: err.Error()}, nil
+	}
+	return &pb.AcknowledgeMessagesResponse{Success: true, Count: count}, nil
 }
 
 func (s *StorageServer) ListPartitions(ctx context.Context, req *pb.ListPartitionsRequest) (*pb.ListPartitionsResponse, error) {

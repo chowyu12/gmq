@@ -1290,9 +1290,6 @@ func (x *ErrorResponse) GetMessage() string {
 // Client-initiated pull message request
 type PullRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ConsumerId    string                 `protobuf:"bytes,1,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
-	ConsumerGroup string                 `protobuf:"bytes,2,opt,name=consumer_group,json=consumerGroup,proto3" json:"consumer_group,omitempty"`
-	Topic         string                 `protobuf:"bytes,3,opt,name=topic,proto3" json:"topic,omitempty"`
 	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1326,27 +1323,6 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
 	return file_proto_gmq_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *PullRequest) GetConsumerId() string {
-	if x != nil {
-		return x.ConsumerId
-	}
-	return ""
-}
-
-func (x *PullRequest) GetConsumerGroup() string {
-	if x != nil {
-		return x.ConsumerGroup
-	}
-	return ""
-}
-
-func (x *PullRequest) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
 }
 
 func (x *PullRequest) GetLimit() int32 {
@@ -1464,13 +1440,9 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"=\n" +
 	"\rErrorResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x81\x01\n" +
-	"\vPullRequest\x12\x1f\n" +
-	"\vconsumer_id\x18\x01 \x01(\tR\n" +
-	"consumerId\x12%\n" +
-	"\x0econsumer_group\x18\x02 \x01(\tR\rconsumerGroup\x12\x14\n" +
-	"\x05topic\x18\x03 \x01(\tR\x05topic\x12\x14\n" +
-	"\x05limit\x18\x04 \x01(\x05R\x05limit*\xa1\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"5\n" +
+	"\vPullRequest\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limitJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04*\xa1\x03\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cMESSAGE_TYPE_PUBLISH_REQUEST\x10\x01\x12!\n" +
