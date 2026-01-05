@@ -1,6 +1,6 @@
 # GMQ (Go Message Queue)
 
-GMQ is a high-performance, production-grade distributed message queue system based on gRPC bidirectional Stream protocol. It adopts a storage and distribution separation architecture, supporting Topic, Partition, consumer group load balancing, and QoS 0/1 message quality guarantees.
+GMQ is a high-performance, production-grade distributed message queue system based on gRPC bidirectional Stream protocol. It adopts a storage and distribution separation architecture, supporting Topic, Partition, and consumer group load balancing.
 
 ## 🚀 Core Features
 
@@ -8,11 +8,11 @@ GMQ is a high-performance, production-grade distributed message queue system bas
 - **Modern Architecture**:
   - **Broker Service**: Integrates connection gateway and distribution logic, completely stateless, supports unlimited horizontal scaling.
   - **Storage Service**: Independent storage layer, supports message persistence and strong consistency management of state (consumers/consumer groups).
-- **Strong Consistency State**: Storage layer uses Redis/DragonflyDB with atomic operations (Lua scripts) to ensure consumer group metadata integrity.
+- **Strong Consistency State**: Storage layer leverages **Redis Stream Consumer Groups** to ensure message delivery guarantees and consumer group metadata integrity.
 - **Flexible Routing**: Supports Partition Key (Hash), specified Partition ID, and random assignment.
 - **Automatic Management**: Supports automatic Topic creation (default 4 partitions), also supports manual interface creation.
-- **Parameterized Connections**: Clients can customize ClientID and message pull interval.
-- **Reliability Guarantees**: Supports QoS 1 (At-Least-Once) acknowledgment mechanism, consumption progress persisted in storage.
+- **Session-Based Connectivity**: Clients bind their identity (ConsumerID/Group) upon subscription, reducing metadata overhead in subsequent requests.
+- **Reliability Guarantees**: Supports message acknowledgment mechanism using Redis PEL (Pending Entries List).
 - **Containerization Support**: Pre-configured Docker Compose deployment configuration.
 
 ## 🏗️ System Architecture
@@ -39,7 +39,7 @@ GMQ is a high-performance, production-grade distributed message queue system bas
 ├───────────────────────────────────────────────────────────┤
 │  - Message Logs (Redis Streams)                          │
 │  - Consumer/Group States (Redis Hash)                    │
-│  - Atomic Fetch (Lua Scripts)                           │
+│  - Native Consumer Groups (XREADGROUP/XACK)              │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -96,7 +96,7 @@ producer, _ := client.NewProducer(&client.ProducerConfig{
 })
 defer producer.Close()
 
-// Send a QoS 1 message with partition key
+// Send a message with partition key
 items := []*pb.PublishItem{
     {
         Topic:       "orders",
