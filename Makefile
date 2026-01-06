@@ -1,43 +1,43 @@
 .PHONY: help proto build run clean up down logs ps example-prod example-group
 
-# 默认目标
+# Default target
 help:
-	@echo "GMQ (Go Message Queue) 管理命令"
-	@echo "  make proto          - 生成 gRPC 协议代码"
-	@echo "  make build          - 编译所有服务及示例"
-	@echo "  make up             - 使用 Docker Compose 启动集群"
-	@echo "  make down           - 停止集群"
-	@echo "  make clean          - 清理编译产物"
-	@echo "  make example-prod   - 运行生产者示例"
-	@echo "  make example-group  - 运行消费组示例"
+	@echo "GMQ (Go Message Queue) Management Commands"
+	@echo "  make proto          - Generate gRPC protocol code"
+	@echo "  make build          - Compile all services and examples"
+	@echo "  make up             - Start the cluster using Docker Compose"
+	@echo "  make down           - Stop the cluster"
+	@echo "  make clean          - Clean up build artifacts"
+	@echo "  make example-prod   - Run producer example"
+	@echo "  make example-group  - Run consumer group example"
 
-# 生成协议代码
+# Generate protocol code
 proto:
-	@echo "生成 gRPC 协议代码..."
+	@echo "Generating gRPC protocol code..."
 	@chmod +x gen_proto.sh
 	@./gen_proto.sh
-	@echo "✓ 代码生成完成"
+	@echo "✓ Code generation completed"
 
-# 编译分布式服务
+# Compile distributed services
 build: proto
-	@echo "构建分布式服务..."
+	@echo "Building distributed services..."
 	@mkdir -p bin
 	@go build -o bin/gmq-storage-service cmd/storage-service/main.go
 	@go build -o bin/gmq-broker-service cmd/broker-service/main.go
-	@echo "构建示例..."
+	@echo "Building examples..."
 	@go build -o bin/producer examples/producer/main.go
 	@go build -o bin/consumer_group examples/consumer_group/main.go
 	@go build -o bin/benchmark examples/benchmark/main.go
-	@echo "✓ 构建完成，二进制文件位于 bin/ 目录"
+	@echo "✓ Build completed, binaries are in bin/ directory"
 
-# Docker 编排
+# Docker orchestration
 up:
-	@echo "正在启动 GMQ 集群..."
+	@echo "Starting GMQ cluster..."
 	@docker-compose up -d --build
-	@echo "✓ 集群已启动，可用端口: Broker(50051), Storage(50052), Dragonfly(6379)"
+	@echo "✓ Cluster started, available ports: Broker(50051), Storage(50052), Dragonfly(6379)"
 
 down:
-	@echo "停止集群..."
+	@echo "Stopping cluster..."
 	@docker-compose down
 
 logs:
@@ -46,20 +46,20 @@ logs:
 ps:
 	@docker-compose ps
 
-# 清理
+# Cleanup
 clean:
-	@echo "清理中..."
+	@echo "Cleaning up..."
 	@rm -rf bin/
-	@echo "✓ 清理完成"
+	@echo "✓ Cleanup completed"
 
-# 运行示例
+# Run examples
 example-prod:
 	@go run examples/producer/main.go
 
 example-group:
 	@go run examples/consumer_group/main.go
 
-# 性能压测
+# Performance benchmark
 bench-prod: build
 	make build
 	@bin/benchmark -mode prod -c 50 -n 200000 -b 500 -s 512
