@@ -12,6 +12,7 @@ GMQ is engineered for extreme performance and reliability, achieving over **140,
 - **Event-Driven Push**: Leverages Redis Pub/Sub combined with persistent gRPC streams to deliver messages instantly as they arrive, eliminating the traditional "polling delay".
 - **Self-Healing Consumer Groups**: Built-in support for Redis PEL (Pending Entries List) and XCLAIM. Messages from crashed consumers are automatically reassigned and recovered.
 - **Compact & Efficient**: Achieving high-performance distributed queuing in **under 2,000 lines of Go code** — proof of clean engineering and efficient architecture.
+- **Admin Portal (Management UI)**: Built-in management dashboard for real-time monitoring of topics, consumer groups, and message exploration.
 
 ---
 
@@ -41,6 +42,12 @@ GMQ is engineered for extreme performance and reliability, achieving over **140,
 │  - Consumer/Group States (Redis Hash)                    │
 │  - Native Consumer Groups (XREADGROUP/XACK)              │
 └───────────────────────────────────────────────────────────┘
+                        ↑
+                        │ gRPC
+                ┌───────┴───────┐
+                │ Admin Portal  │
+                │   (Port 8080) │
+                └───────────────┘
 ```
 
 ## 📂 Project Structure
@@ -134,8 +141,10 @@ for {
 | Command | Description |
 |---------|-------------|
 | `make build` | Build all binaries |
-| `make docker` | Start services with Docker Compose |
-| `make docker-logs` | View container logs |
+| `make up` | Start services with Docker Compose |
+| `make admin` | Run admin dashboard service |
+| `make logs` | View container logs |
+| `make ps` | View container status |
 | `make clean` | Clean build artifacts and storage data |
 | `make proto` | Regenerate gRPC protocol code |
 
