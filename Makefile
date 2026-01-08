@@ -1,4 +1,4 @@
-.PHONY: help proto build run clean up down logs ps example-prod example-group
+.PHONY: help proto build run clean up down logs ps example-prod example-group admin
 
 # Default target
 help:
@@ -24,6 +24,7 @@ build: proto
 	@mkdir -p bin
 	@go build -o bin/gmq-storage-service cmd/storage-service/main.go
 	@go build -o bin/gmq-broker-service cmd/broker-service/main.go
+	@go build -o bin/gmq-admin-service cmd/admin-service/main.go
 	@echo "Building examples..."
 	@go build -o bin/producer examples/producer/main.go
 	@go build -o bin/consumer_group examples/consumer_group/main.go

@@ -70,6 +70,34 @@ services:
       timeout: 5s
       retries: 3
 
+  # Admin Service - 管理控制台
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: admin
+    container_name: gmq-admin
+    command:
+      - /app/gmq-admin-service
+      - -addr
+      - ":8080"
+      - -broker
+      - broker:50051
+      - -storage
+      - storage:50052
+      - -redis-addr
+      - dragonfly:6379
+    ports:
+      - "8080:8080"
+    networks:
+      - gmq-network
+    depends_on:
+      broker:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    restart: unless-stopped
+
 networks:
   gmq-network:
     driver: bridge

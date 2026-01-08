@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMQ Management Portal</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --border: #e2e8f0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', -apple-system, sans-serif; 
+            background: var(--bg-color); 
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: #0f172a;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            position: fixed;
+            height: 100vh;
+        }
+        .sidebar-brand {
+            padding: 0 24px 30px;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-item {
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #94a3b8;
+        }
+        .nav-item:hover { background: #1e293b; color: white; }
+        .nav-item.active { 
+            background: var(--primary-color); 
+            color: white; 
+            border-right: 4px solid white;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            flex: 1;
+            padding: 40px;
+            max-width: calc(100% - 260px);
+        }
+
+        .header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; }
+        .page-title { font-size: 28px; font-weight: 700; color: var(--text-main); }
+
+        /* Components */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+        .card-header { margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        button:hover { opacity: 0.9; }
+
+        input {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            outline: none;
+            width: 260px;
+            margin-right: 8px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px; color: var(--text-muted); font-size: 13px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 16px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .tag {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .code-box {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-brand">🚀 GMQ Admin</div>
+        <div class="nav-item active" onclick="showTab('topics')">📁 Topics Management</div>
+        <div class="nav-item" onclick="showTab('consumers')">👥 Consumer Groups</div>
+        <div class="nav-item" onclick="showTab('messages')">✉️ Message Explorer</div>
+        <div class="nav-item" onclick="showTab('publish')">📤 Publish Test</div>
+    </div>
+
+    <div class="main-content">
+        <!-- Topics Tab -->
+        <div id="topics" class="tab-content active">
+            <div class="header">
+                <h1 class="page-title">Topics</h1>
+                <button class="btn-primary" onclick="loadTopics()">🔄 Refresh</button>
+            </div>
+            
+            <div class="card">
+                <div class="card-header"><h3>Create New Topic</h3></div>
+                <input type="text" id="newTopic" placeholder="Topic name">
+                <input type="number" id="partitions" placeholder="Partitions" value="4" style="width: 100px;">
+                <button class="btn-primary" onclick="createTopic()">Create</button>
+            </div>
+
+            <div class="card">
+                <div id="topicsList"></div>
+            </div>
+        </div>
+
+        <!-- Consumers Tab -->
+        <div id="consumers" class="tab-content">
+            <div class="header">
+                <h1 class="page-title">Consumer Groups</h1>
+            </div>
+            <div class="card">
+                <select id="groupTopic" style="width: 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; margin-right: 8px;">
+                    <option value="">-- Select Topic --</option>
+                </select>
+                <button class="btn-primary" onclick="loadConsumerGroups()">Load Data</button>
+            </div>
+            <div id="groupsList"></div>
+        </div>
+
+        <!-- Messages Tab -->
+        <div id="messages" class="tab-content">
+            <div class="header">
+                <h1 class="page-title">Message Explorer</h1>
+            </div>
+            <div class="card">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <select id="viewTopic" style="width: 200px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
+                        <option value="">-- All Topics --</option>
+                    </select>
+                    <input type="number" id="viewPartition" placeholder="All Partitions" style="width: 120px;">
+                    <input type="number" id="viewLimit" placeholder="Limit" value="50" style="width: 80px;">
+                    <input type="text" id="viewStartOffset" placeholder="Offset (Optional)">
+                    <button class="btn-primary" onclick="loadMessages()">🔍 Search</button>
+                    <button class="btn-outline" onclick="loadNextMessages()">Next Page ➔</button>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">
+                    * Leave Topic/Partition empty to scan everything. Results are sorted by time (newest first).
+                </p>
+            </div>
+            <div id="messagesList"></div>
+        </div>
+
+        <!-- Publish Tab -->
+        <div id="publish" class="tab-content">
+            <div class="header">
+                <h1 class="page-title">Publish Test</h1>
+            </div>
+            <div class="card">
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Topic</label>
+                        <select id="msgTopic" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
+                            <option value="">-- Select Existing Topic --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Payload (String/JSON)</label>
+                        <textarea id="msgPayload" rows="5" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px;"></textarea>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Partition Key (Optional)</label>
+                        <input type="text" id="msgKey" placeholder="e.g. user_123" style="width: 100%;">
+                    </div>
+                    <button class="btn-primary" onclick="sendMessage()" style="align-self: flex-start; padding: 12px 32px;">Send Message</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+            if(tabId === 'topics') loadTopics();
+            if(tabId === 'publish') updateTopicSelectors();
+        }
+
+        async function updateTopicSelectors() {
+            try {
+                const res = await fetch('/api/topics');
+                const data = await res.json();
+                if(!data.success) {
+                    console.error('Failed to load topics:', data.error);
+                    return;
+                }
+                
+                const topics = data.data || [];
+                const selectors = ['msgTopic', 'viewTopic', 'groupTopic'];
+                
+                selectors.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    
+                    const currentVal = el.value;
+                    el.innerHTML = '<option value="">-- Select Existing Topic --</option>';
+                    topics.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.topic;
+                        opt.textContent = t.topic;
+                        el.appendChild(opt);
+                    });
+                    
+                    // Restore value if it still exists in the new list
+                    if (currentVal && topics.find(t => t.topic === currentVal)) {
+                        el.value = currentVal;
+                    }
+                });
+            } catch (err) {
+                console.error('Error fetching topics:', err);
+            }
+        }
+
+        async function createTopic() {
+            const topic = document.getElementById('newTopic').value;
+            const partitions = parseInt(document.getElementById('partitions').value) || 4;
+            const res = await fetch('/api/topics', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({topic, partitions})
+            });
+            const data = await res.json();
+            if(data.success) { alert('Success'); loadTopics(); } else alert('Error: ' + data.error);
+        }
+
+        async function deleteTopic(topic) {
+            if(!confirm(`Are you sure you want to delete topic "${topic}" and ALL its data?`)) return;
+            const res = await fetch('/api/topics/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({topic})
+            });
+            const data = await res.json();
+            if(data.success) { alert('Deleted'); loadTopics(); } else alert('Error: ' + data.error);
+        }
+
+        async function loadTopics() {
+            const res = await fetch('/api/topics');
+            const data = await res.json();
+            const list = document.getElementById('topicsList');
+            if(!data.success) { list.innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+            
+            let html = '<table><tr><th>Topic Name</th><th>Partitions</th><th>Msgs</th><th>Actions</th></tr>';
+            (data.data || []).forEach(t => {
+                const total = t.partitions.reduce((s, p) => s + (p.message_count || 0), 0);
+                html += `<tr>
+                    <td><b>${t.topic}</b></td>
+                    <td>${t.partitions.length}</td>
+                    <td><span class="tag">${total}</span></td>
+                    <td>
+                        <button class="btn-outline" onclick="switchToMessages('${t.topic}')">View</button>
+                        <button class="btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteTopic('${t.topic}')">Delete</button>
+                    </td>
+                </tr>`;
+            });
+            list.innerHTML = html + '</table>';
+        }
+
+        function switchToMessages(topic) {
+            const el = document.getElementById('viewTopic');
+            // Check if topic exists in select, if not, add it dynamically
+            let exists = false;
+            for(let i=0; i<el.options.length; i++) {
+                if(el.options[i].value === topic) { exists = true; break; }
+            }
+            if(!exists) {
+                const opt = document.createElement('option');
+                opt.value = topic;
+                opt.textContent = topic;
+                el.appendChild(opt);
+            }
+            
+            el.value = topic;
+            document.getElementById('viewPartition').value = 0;
+            
+            // Find and click the Message Explorer nav item
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                if (item.textContent.includes('Message Explorer')) {
+                    item.click();
+                }
+            });
+            loadMessages();
+        }
+
+        async function loadConsumerGroups() {
+            const topic = document.getElementById('groupTopic').value;
+            if(!topic) return alert('Please input topic name');
+            const res = await fetch('/api/consumer-groups?topic=' + topic);
+            const data = await res.json();
+            const list = document.getElementById('groupsList');
+            
+            let html = '';
+            (data.data || []).forEach(g => {
+                html += `<div class="card">
+                    <h3>Group: ${g.group}</h3>
+                    <p style="color:var(--text-muted); margin: 8px 0;">Consumers: ${g.consumers.length}</p>
+                    <div class="code-box">${JSON.stringify(g.assignment, null, 2)}</div>
+                </div>`;
+            });
+            list.innerHTML = html || '<p>No groups found for this topic.</p>';
+        }
+
+        async function sendMessage() {
+            const topic = document.getElementById('msgTopic').value;
+
+            if (!topic) return alert('Please select a topic');
+
+            const res = await fetch('/api/send-message', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    topic: topic,
+                    payload: document.getElementById('msgPayload').value,
+                    partition_key: document.getElementById('msgKey').value
+                })
+            });
+            const data = await res.json();
+            alert(data.success ? 'Message Sent' : 'Failed: ' + data.error);
+        }
+
+        let lastOffset = null;
+        async function loadMessages() {
+            const topic = document.getElementById('viewTopic').value;
+            const part = document.getElementById('viewPartition').value;
+            const limit = document.getElementById('viewLimit').value || 50;
+            const start = document.getElementById('viewStartOffset').value;
+            
+            let url = `/api/messages?limit=${limit}`;
+            if(topic) url += `&topic=${encodeURIComponent(topic)}`;
+            if(part !== '') url += `&partition_id=${part}`;
+            if(start) url += `&start_offset=${start}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+            const list = document.getElementById('messagesList');
+            
+            if(!data.success) { list.innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+            
+            const msgs = data.data || [];
+            lastOffset = msgs.length ? msgs[msgs.length-1].offset : null;
+            
+            let html = '<table><tr><th>Offset</th><th>Time</th><th>Payload</th></tr>';
+            msgs.forEach(m => {
+                html += `<tr>
+                    <td><code>${m.offset}</code></td>
+                    <td style="white-space:nowrap">${new Date(m.timestamp).toLocaleString()}</td>
+                    <td><div class="code-box" style="padding:8px; background:#f1f5f9; color:#1e293b; font-size:12px;">${escapeHtml(m.payload)}</div></td>
+                </tr>`;
+            });
+            list.innerHTML = html + '</table>';
+        }
+
+        function loadNextMessages() {
+            if(!lastOffset) return alert('Load messages first');
+            document.getElementById('viewStartOffset').value = lastOffset + 1;
+            loadMessages();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        loadTopics();
+        updateTopicSelectors();
+    </script>
+</body>
+</html>
