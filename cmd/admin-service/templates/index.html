@@ -188,7 +188,7 @@
                     <input type="number" id="viewPartition" placeholder="All Partitions" style="width: 120px;">
                     <input type="number" id="viewLimit" placeholder="Limit" value="50" style="width: 80px;">
                     <input type="text" id="viewStartOffset" placeholder="Offset (Optional)">
-                    <button class="btn-primary" onclick="loadMessages()">🔍 Search</button>
+                    <button class="btn-primary" onclick="searchMessages()">🔍 Search</button>
                     <button class="btn-outline" onclick="loadNextMessages()">Next Page ➔</button>
                 </div>
                 <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">
@@ -383,7 +383,8 @@
             const topic = document.getElementById('viewTopic').value;
             const part = document.getElementById('viewPartition').value;
             const limit = document.getElementById('viewLimit').value || 50;
-            const start = document.getElementById('viewStartOffset').value;
+            // Use a local variable for pagination offset so it doesn't show in the UI input box unless typed by user
+            let start = document.getElementById('viewStartOffset').value;
             
             let url = `/api/messages?limit=${limit}`;
             if(topic) url += `&topic=${encodeURIComponent(topic)}`;
@@ -407,12 +408,19 @@
                     <td><div class="code-box" style="padding:8px; background:#f1f5f9; color:#1e293b; font-size:12px;">${escapeHtml(m.payload)}</div></td>
                 </tr>`;
             });
-            list.innerHTML = html + '</table>';
+            list.innerHTML = html + (msgs.length === 0 ? '<tr><td colspan="3" style="text-align:center">No more messages found</td></tr>' : '') + '</table>';
         }
 
         function loadNextMessages() {
-            if(!lastOffset) return alert('Load messages first');
-            document.getElementById('viewStartOffset').value = lastOffset + 1;
+            if(!lastOffset) return alert('No more messages');
+            // We set the hidden input value but we can clear it on a new 'Search'
+            document.getElementById('viewStartOffset').value = lastOffset;
+            loadMessages();
+        }
+
+        // Add this to clear pagination when user clicks Search button manually
+        function searchMessages() {
+            document.getElementById('viewStartOffset').value = '';
             loadMessages();
         }
 

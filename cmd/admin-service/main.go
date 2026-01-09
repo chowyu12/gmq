@@ -423,7 +423,8 @@ func encodeOffset(id string) int64 {
 	}
 	ts, _ := strconv.ParseInt(parts[0], 10, 64)
 	seq, _ := strconv.ParseInt(parts[1], 10, 64)
-	return (ts << 20) | (seq & 0xFFFFF)
+	// Use 48 bits for timestamp, 16 bits for sequence (65535 msgs/ms)
+	return (ts << 16) | (seq & 0xFFFF)
 }
 
 // Helper function: decode int64 offset back to Redis ID string
@@ -431,8 +432,8 @@ func decodeOffset(offset int64) string {
 	if offset <= 0 {
 		return "-"
 	}
-	ts := offset >> 20
-	seq := offset & 0xFFFFF
+	ts := offset >> 16
+	seq := offset & 0xFFFF
 	return fmt.Sprintf("%d-%d", ts, seq)
 }
 
@@ -463,7 +464,7 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 	var result []MessageResp
-	
+
 	// Determine topics and partitions to scan
 	var topics []string
 	if topic != "" {
@@ -503,23 +504,25 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 		for _, pid := range pids {
 			streamKey := fmt.Sprintf("gmq:stream:%s:%d", t, pid)
-			startID := "-"
-			if startOffset > 0 {
-				startID = decodeOffset(startOffset)
+
+			var messages []redis.XMessage
+			var err error
+
+			if startOffset <= 0 {
+				// Get latest messages (Reverse scan from end)
+				messages, err = s.redisClient.XRevRangeN(ctx, streamKey, "+", "-", int64(limit)).Result()
+			} else {
+				// Get messages older than startOffset (Reverse scan from startOffset-1)
+				// Redis ID is "ts-seq". To get older, we use "(" + ID
+				messages, err = s.redisClient.XRevRangeN(ctx, streamKey, "("+decodeOffset(startOffset), "-", int64(limit)).Result()
 			}
 
-			messages, err := s.redisClient.XRange(ctx, streamKey, startID, "+").Result()
 			if err != nil {
 				continue
 			}
 
 			for _, msg := range messages {
 				offset := encodeOffset(msg.ID)
-				// Skip if offset is the same as startOffset (when paginating)
-				if startOffset > 0 && offset <= startOffset {
-					continue
-				}
-
 				payload := ""
 				if data, ok := msg.Values["d"].(string); ok {
 					payload = data
@@ -538,12 +541,12 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Sort results by timestamp/offset descending
+	// Sort results by timestamp/offset descending (globally across partitions)
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Offset > result[j].Offset
 	})
 
-	// Apply limit
+	// Apply limit (since we might have multiple partitions)
 	if len(result) > limit {
 		result = result[:limit]
 	}
