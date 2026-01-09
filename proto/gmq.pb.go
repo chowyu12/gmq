@@ -409,7 +409,7 @@ type PublishItem struct {
 	// Partition key (used to determine partition)
 	PartitionKey string `protobuf:"bytes,2,opt,name=partition_key,json=partitionKey,proto3" json:"partition_key,omitempty"`
 	// Specify partition ID (optional, priority higher than partition_key)
-	PartitionId int32 `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	PartitionId *int32 `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3,oneof" json:"partition_id,omitempty"`
 	// Message body
 	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	// Message properties
@@ -466,8 +466,8 @@ func (x *PublishItem) GetPartitionKey() string {
 }
 
 func (x *PublishItem) GetPartitionId() int32 {
-	if x != nil {
-		return x.PartitionId
+	if x != nil && x.PartitionId != nil {
+		return *x.PartitionId
 	}
 	return 0
 }
@@ -1358,11 +1358,11 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x0ePublishRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12&\n" +
-	"\x05items\x18\x02 \x03(\v2\x10.gmq.PublishItemR\x05items\"\xd0\x02\n" +
+	"\x05items\x18\x02 \x03(\v2\x10.gmq.PublishItemR\x05items\"\xe6\x02\n" +
 	"\vPublishItem\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12#\n" +
-	"\rpartition_key\x18\x02 \x01(\tR\fpartitionKey\x12!\n" +
-	"\fpartition_id\x18\x03 \x01(\x05R\vpartitionId\x12\x18\n" +
+	"\rpartition_key\x18\x02 \x01(\tR\fpartitionKey\x12&\n" +
+	"\fpartition_id\x18\x03 \x01(\x05H\x00R\vpartitionId\x88\x01\x01\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12@\n" +
 	"\n" +
 	"properties\x18\x05 \x03(\v2 .gmq.PublishItem.PropertiesEntryR\n" +
@@ -1372,7 +1372,8 @@ const file_proto_gmq_proto_rawDesc = "" +
 	"\x0fsequence_number\x18\a \x01(\x03R\x0esequenceNumber\x1a=\n" +
 	"\x0fPropertiesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"^\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0f\n" +
+	"\r_partition_id\"^\n" +
 	"\x0fPublishResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12,\n" +
@@ -1542,6 +1543,7 @@ func file_proto_gmq_proto_init() {
 		(*StreamMessage_ErrorResp)(nil),
 		(*StreamMessage_PullReq)(nil),
 	}
+	file_proto_gmq_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,10 +18,15 @@
             --border: #e2e8f0;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Inter', -apple-system, sans-serif; 
-            background: var(--bg-color); 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-color);
             color: var(--text-main);
             display: flex;
             min-height: 100vh;
@@ -37,6 +43,7 @@
             position: fixed;
             height: 100vh;
         }
+
         .sidebar-brand {
             padding: 0 24px 30px;
             font-size: 24px;
@@ -45,6 +52,7 @@
             align-items: center;
             gap: 10px;
         }
+
         .nav-item {
             padding: 12px 24px;
             cursor: pointer;
@@ -54,10 +62,15 @@
             gap: 12px;
             color: #94a3b8;
         }
-        .nav-item:hover { background: #1e293b; color: white; }
-        .nav-item.active { 
-            background: var(--primary-color); 
-            color: white; 
+
+        .nav-item:hover {
+            background: #1e293b;
+            color: white;
+        }
+
+        .nav-item.active {
+            background: var(--primary-color);
+            color: white;
             border-right: 4px solid white;
         }
 
@@ -69,8 +82,18 @@
             max-width: calc(100% - 260px);
         }
 
-        .header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; }
-        .page-title { font-size: 28px; font-weight: 700; color: var(--text-main); }
+        .header {
+            margin-bottom: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
 
         /* Components */
         .card {
@@ -78,11 +101,16 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             margin-bottom: 24px;
         }
-        .card-header { margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-        
+
+        .card-header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+        }
+
         button {
             padding: 8px 16px;
             border-radius: 6px;
@@ -91,10 +119,26 @@
             font-weight: 500;
             transition: opacity 0.2s;
         }
-        .btn-primary { background: var(--primary-color); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
-        button:hover { opacity: 0.9; }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
 
         input {
             padding: 10px 12px;
@@ -105,12 +149,33 @@
             margin-right: 8px;
         }
 
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; color: var(--text-muted); font-size: 13px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-        td { padding: 16px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
-        
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            color: var(--text-muted);
+            font-size: 13px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
 
         .tag {
             padding: 2px 8px;
@@ -130,9 +195,53 @@
             overflow-x: auto;
             max-height: 400px;
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 10% auto;
+            padding: 24px;
+            border-radius: 12px;
+            width: 60%;
+            max-width: 800px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
     </style>
 </head>
+
 <body>
+    <div id="msgModal" class="modal">
+        <div class="modal-content">
+            <div class="header" style="margin-bottom: 16px;">
+                <h2 id="modalTitle">Message Detail</h2>
+                <button class="btn-outline" onclick="closeModal()">Close</button>
+            </div>
+            <div id="modalBody">
+                <div style="margin-bottom: 12px;">
+                    <p style="margin-bottom: 4px;"><strong>Message ID:</strong> <span id="modalMsgID"
+                            class="tag"></span></p>
+                    <p style="margin-bottom: 4px;"><strong>Offset:</strong> <code id="modalOffset"></code></p>
+                    <p style="margin-bottom: 4px;"><strong>Time:</strong> <span id="modalTime"></span></p>
+                </div>
+                <div style="margin-top: 16px;">
+                    <strong>Payload:</strong>
+                    <div id="modalPayload" class="code-box"
+                        style="margin-top: 8px; background: #f1f5f9; color: #1e293b; border: 1px solid var(--border); overflow: auto; max-height: 500px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="sidebar">
         <div class="sidebar-brand">🚀 GMQ Admin</div>
         <div class="nav-item active" onclick="showTab('topics')">📁 Topics Management</div>
@@ -148,9 +257,11 @@
                 <h1 class="page-title">Topics</h1>
                 <button class="btn-primary" onclick="loadTopics()">🔄 Refresh</button>
             </div>
-            
+
             <div class="card">
-                <div class="card-header"><h3>Create New Topic</h3></div>
+                <div class="card-header">
+                    <h3>Create New Topic</h3>
+                </div>
                 <input type="text" id="newTopic" placeholder="Topic name">
                 <input type="number" id="partitions" placeholder="Partitions" value="4" style="width: 100px;">
                 <button class="btn-primary" onclick="createTopic()">Create</button>
@@ -167,7 +278,8 @@
                 <h1 class="page-title">Consumer Groups</h1>
             </div>
             <div class="card">
-                <select id="groupTopic" style="width: 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; margin-right: 8px;">
+                <select id="groupTopic"
+                    style="width: 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; margin-right: 8px;">
                     <option value="">-- Select Topic --</option>
                 </select>
                 <button class="btn-primary" onclick="loadConsumerGroups()">Load Data</button>
@@ -182,12 +294,14 @@
             </div>
             <div class="card">
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <select id="viewTopic" style="width: 200px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
+                    <select id="viewTopic"
+                        style="width: 200px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
                         <option value="">-- All Topics --</option>
                     </select>
                     <input type="number" id="viewPartition" placeholder="All Partitions" style="width: 120px;">
                     <input type="number" id="viewLimit" placeholder="Limit" value="50" style="width: 80px;">
                     <input type="text" id="viewStartOffset" placeholder="Offset (Optional)">
+                    <input type="text" id="viewMsgID" placeholder="Message ID (Optional)" style="width: 180px;">
                     <button class="btn-primary" onclick="searchMessages()">🔍 Search</button>
                     <button class="btn-outline" onclick="loadNextMessages()">Next Page ➔</button>
                 </div>
@@ -207,19 +321,24 @@
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                     <div>
                         <label style="display: block; margin-bottom: 8px; font-weight: 500;">Topic</label>
-                        <select id="msgTopic" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
+                        <select id="msgTopic"
+                            style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
                             <option value="">-- Select Existing Topic --</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Payload (String/JSON)</label>
-                        <textarea id="msgPayload" rows="5" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px;"></textarea>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Payload
+                            (String/JSON)</label>
+                        <textarea id="msgPayload" rows="5"
+                            style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px;"></textarea>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Partition Key (Optional)</label>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Partition Key
+                            (Optional)</label>
                         <input type="text" id="msgKey" placeholder="e.g. user_123" style="width: 100%;">
                     </div>
-                    <button class="btn-primary" onclick="sendMessage()" style="align-self: flex-start; padding: 12px 32px;">Send Message</button>
+                    <button class="btn-primary" onclick="sendMessage()"
+                        style="align-self: flex-start; padding: 12px 32px;">Send Message</button>
                 </div>
             </div>
         </div>
@@ -231,26 +350,26 @@
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             event.currentTarget.classList.add('active');
-            if(tabId === 'topics') loadTopics();
-            if(tabId === 'publish') updateTopicSelectors();
+            if (tabId === 'topics') loadTopics();
+            if (tabId === 'publish') updateTopicSelectors();
         }
 
         async function updateTopicSelectors() {
             try {
                 const res = await fetch('/api/topics');
                 const data = await res.json();
-                if(!data.success) {
+                if (!data.success) {
                     console.error('Failed to load topics:', data.error);
                     return;
                 }
-                
+
                 const topics = data.data || [];
                 const selectors = ['msgTopic', 'viewTopic', 'groupTopic'];
-                
+
                 selectors.forEach(id => {
                     const el = document.getElementById(id);
                     if (!el) return;
-                    
+
                     const currentVal = el.value;
                     el.innerHTML = '<option value="">-- Select Existing Topic --</option>';
                     topics.forEach(t => {
@@ -259,7 +378,7 @@
                         opt.textContent = t.topic;
                         el.appendChild(opt);
                     });
-                    
+
                     // Restore value if it still exists in the new list
                     if (currentVal && topics.find(t => t.topic === currentVal)) {
                         el.value = currentVal;
@@ -275,30 +394,30 @@
             const partitions = parseInt(document.getElementById('partitions').value) || 4;
             const res = await fetch('/api/topics', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({topic, partitions})
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic, partitions })
             });
             const data = await res.json();
-            if(data.success) { alert('Success'); loadTopics(); } else alert('Error: ' + data.error);
+            if (data.success) { alert('Success'); loadTopics(); } else alert('Error: ' + data.error);
         }
 
         async function deleteTopic(topic) {
-            if(!confirm(`Are you sure you want to delete topic "${topic}" and ALL its data?`)) return;
+            if (!confirm(`Are you sure you want to delete topic "${topic}" and ALL its data?`)) return;
             const res = await fetch('/api/topics/delete', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({topic})
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic })
             });
             const data = await res.json();
-            if(data.success) { alert('Deleted'); loadTopics(); } else alert('Error: ' + data.error);
+            if (data.success) { alert('Deleted'); loadTopics(); } else alert('Error: ' + data.error);
         }
 
         async function loadTopics() {
             const res = await fetch('/api/topics');
             const data = await res.json();
             const list = document.getElementById('topicsList');
-            if(!data.success) { list.innerHTML = `<p style="color:red">${data.error}</p>`; return; }
-            
+            if (!data.success) { list.innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+
             let html = '<table><tr><th>Topic Name</th><th>Partitions</th><th>Msgs</th><th>Actions</th></tr>';
             (data.data || []).forEach(t => {
                 const total = t.partitions.reduce((s, p) => s + (p.message_count || 0), 0);
@@ -319,19 +438,19 @@
             const el = document.getElementById('viewTopic');
             // Check if topic exists in select, if not, add it dynamically
             let exists = false;
-            for(let i=0; i<el.options.length; i++) {
-                if(el.options[i].value === topic) { exists = true; break; }
+            for (let i = 0; i < el.options.length; i++) {
+                if (el.options[i].value === topic) { exists = true; break; }
             }
-            if(!exists) {
+            if (!exists) {
                 const opt = document.createElement('option');
                 opt.value = topic;
                 opt.textContent = topic;
                 el.appendChild(opt);
             }
-            
+
             el.value = topic;
             document.getElementById('viewPartition').value = 0;
-            
+
             // Find and click the Message Explorer nav item
             const navItems = document.querySelectorAll('.nav-item');
             navItems.forEach(item => {
@@ -344,11 +463,11 @@
 
         async function loadConsumerGroups() {
             const topic = document.getElementById('groupTopic').value;
-            if(!topic) return alert('Please input topic name');
+            if (!topic) return alert('Please input topic name');
             const res = await fetch('/api/consumer-groups?topic=' + topic);
             const data = await res.json();
             const list = document.getElementById('groupsList');
-            
+
             let html = '';
             (data.data || []).forEach(g => {
                 html += `<div class="card">
@@ -367,7 +486,7 @@
 
             const res = await fetch('/api/send-message', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     topic: topic,
                     payload: document.getElementById('msgPayload').value,
@@ -383,36 +502,40 @@
             const topic = document.getElementById('viewTopic').value;
             const part = document.getElementById('viewPartition').value;
             const limit = document.getElementById('viewLimit').value || 50;
+            const msgId = document.getElementById('viewMsgID').value;
             // Use a local variable for pagination offset so it doesn't show in the UI input box unless typed by user
             let start = document.getElementById('viewStartOffset').value;
-            
+
             let url = `/api/messages?limit=${limit}`;
-            if(topic) url += `&topic=${encodeURIComponent(topic)}`;
-            if(part !== '') url += `&partition_id=${part}`;
-            if(start) url += `&start_offset=${start}`;
+            if (topic) url += `&topic=${encodeURIComponent(topic)}`;
+            if (part !== '') url += `&partition_id=${part}`;
+            if (start) url += `&start_offset=${start}`;
+            if (msgId) url += `&msg_id=${encodeURIComponent(msgId)}`;
 
             const res = await fetch(url);
             const data = await res.json();
             const list = document.getElementById('messagesList');
-            
-            if(!data.success) { list.innerHTML = `<p style="color:red">${data.error}</p>`; return; }
-            
+
+            if (!data.success) { list.innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+
             const msgs = data.data || [];
-            lastOffset = msgs.length ? msgs[msgs.length-1].offset : null;
-            
-            let html = '<table><tr><th>Offset</th><th>Time</th><th>Payload</th></tr>';
+            lastOffset = msgs.length ? msgs[msgs.length - 1].offset : null;
+
+            let html = '<table><tr><th>Topic:Part</th><th>Message ID</th><th>Offset</th><th>Time</th><th>Size</th></tr>';
             msgs.forEach(m => {
                 html += `<tr>
+                    <td><span class="tag">${m.topic}:${m.partition_id}</span></td>
+                    <td><a href="javascript:void(0)" onclick="showMsgDetail('${encodeURIComponent(m.topic)}', ${m.partition_id}, '${encodeURIComponent(m.msg_id)}')" style="color:var(--primary-color); font-family:monospace; text-decoration:none; border-bottom:1px dashed var(--primary-color)">${m.msg_id}</a></td>
                     <td><code>${m.offset}</code></td>
                     <td style="white-space:nowrap">${new Date(m.timestamp).toLocaleString()}</td>
-                    <td><div class="code-box" style="padding:8px; background:#f1f5f9; color:#1e293b; font-size:12px;">${escapeHtml(m.payload)}</div></td>
+                    <td><span class="tag">${m.payload_size} bytes</span></td>
                 </tr>`;
             });
             list.innerHTML = html + (msgs.length === 0 ? '<tr><td colspan="3" style="text-align:center">No more messages found</td></tr>' : '') + '</table>';
         }
 
         function loadNextMessages() {
-            if(!lastOffset) return alert('No more messages');
+            if (!lastOffset) return alert('No more messages');
             // We set the hidden input value but we can clear it on a new 'Search'
             document.getElementById('viewStartOffset').value = lastOffset;
             loadMessages();
@@ -421,6 +544,11 @@
         // Add this to clear pagination when user clicks Search button manually
         function searchMessages() {
             document.getElementById('viewStartOffset').value = '';
+            // If Partition is empty, ensure it's treated as null/all
+            const partEl = document.getElementById('viewPartition');
+            if (partEl.value === '') {
+                // Keep it empty
+            }
             loadMessages();
         }
 
@@ -430,8 +558,42 @@
             return div.innerHTML;
         }
 
+        async function showMsgDetail(topic, part, msgId) {
+            try {
+                const url = `/api/messages?topic=${encodeURIComponent(topic)}&partition_id=${part}&msg_id=${msgId}`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.success && data.data.length > 0) {
+                    const msg = data.data[0];
+                    document.getElementById('modalMsgID').textContent = msg.msg_id;
+                    document.getElementById('modalOffset').textContent = msg.offset;
+                    document.getElementById('modalTime').textContent = new Date(msg.timestamp).toLocaleString();
+                    document.getElementById('modalPayload').textContent = msg.payload;
+                    document.getElementById('msgModal').style.display = 'block';
+                } else {
+                    alert('Message not found or error: ' + (data.error || 'unknown'));
+                }
+            } catch (err) {
+                alert('Error loading message detail: ' + err);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('msgModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('msgModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
         loadTopics();
         updateTopicSelectors();
     </script>
 </body>
+
 </html>

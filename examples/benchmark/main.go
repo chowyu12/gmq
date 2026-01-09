@@ -36,6 +36,9 @@ func main() {
 
 func runProducerBench() {
 	payload := make([]byte, *msgSize)
+	for i := range payload {
+		payload[i] = byte('a' + (i % 26)) // Fill with a-z pattern for predictability
+	}
 
 	fmt.Printf("=== GMQ Producer Throughput Benchmark ===\n")
 	fmt.Printf("Address: %s | Topic: %s\n", *addr, *topic)
@@ -85,8 +88,9 @@ func runProducerBench() {
 				items := make([]*pb.PublishItem, *batchSize)
 				for j := 0; j < *batchSize; j++ {
 					items[j] = &pb.PublishItem{
-						Topic:   *topic,
-						Payload: payload,
+						Topic:        *topic,
+						Payload:      payload,
+						PartitionKey: fmt.Sprintf("key-%d", j),
 					}
 				}
 
@@ -149,7 +153,7 @@ func runConsumerBench() {
 				mctx, err := consumer.Receive(context.Background(), 5*time.Second)
 				if err != nil {
 					if err == context.DeadlineExceeded {
-						continue 
+						continue
 					}
 					fmt.Printf("Consumer error [%d]: %v\n", id, err)
 					break

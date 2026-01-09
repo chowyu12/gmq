@@ -107,7 +107,10 @@ type ConsumerInfoResp struct {
 }
 
 type MessageResp struct {
+	Topic       string `json:"topic"`
+	PartitionID int32  `json:"partition_id"`
 	Offset      int64  `json:"offset"`
+	MsgID       string `json:"msg_id"`
 	Payload     string `json:"payload"`
 	PayloadSize int    `json:"payload_size"`
 	Timestamp   int64  `json:"timestamp"`
@@ -350,7 +353,7 @@ func (s *AdminServer) handleSendMessage(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Topic        string `json:"topic"`
 		Payload      string `json:"payload"`
-		PartitionID  int32  `json:"partition_id,omitempty"`
+		PartitionID  *int32 `json:"partition_id,omitempty"`
 		PartitionKey string `json:"partition_key,omitempty"`
 	}
 
@@ -447,6 +450,11 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 	partitionIDStr := r.URL.Query().Get("partition_id")
 	limitStr := r.URL.Query().Get("limit")
 	startOffsetStr := r.URL.Query().Get("start_offset")
+	msgID := r.URL.Query().Get("msg_id")
+
+	// If partitionIDStr is explicitly provided but empty, treat it as "no partition filter"
+	// but if it's missing from URL entirely, it should also be "no partition filter".
+	// The problem might be how we parse it below.
 
 	limit := 100
 	if limitStr != "" {
@@ -464,6 +472,36 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 	var result []MessageResp
+
+	// If a specific Message ID (Redis ID format) is provided, try to fetch it directly
+	// We need topic and partition_id to find the correct stream key
+	if msgID != "" && topic != "" && partitionIDStr != "" {
+		pid, _ := strconv.Atoi(partitionIDStr)
+		streamKey := fmt.Sprintf("gmq:stream:%s:%d", topic, pid)
+		messages, err := s.redisClient.XRange(ctx, streamKey, msgID, msgID).Result()
+		if err == nil && len(messages) > 0 {
+			msg := messages[0]
+			parts := strings.Split(msg.ID, "-")
+			ts, _ := strconv.ParseInt(parts[0], 10, 64)
+			payload := ""
+			if data, ok := msg.Values["d"].(string); ok {
+				payload = data
+			} else if data, ok := msg.Values["d"].([]byte); ok {
+				payload = string(data)
+			}
+			result = append(result, MessageResp{
+				Topic:       topic,
+				PartitionID: int32(pid),
+				Offset:      encodeOffset(msg.ID),
+				MsgID:       msg.ID,
+				Payload:     payload,
+				PayloadSize: len(payload),
+				Timestamp:   ts,
+			})
+			json.NewEncoder(w).Encode(APIResponse{Success: true, Data: result})
+			return
+		}
+	}
 
 	// Determine topics and partitions to scan
 	var topics []string
@@ -491,12 +529,17 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 			if pid, err := strconv.Atoi(partitionIDStr); err == nil {
 				pids = []int32{int32(pid)}
 			}
-		} else {
-			// Scan all partitions for this topic
+		}
+
+		// If pids is still empty (meaning partitionIDStr was empty or invalid),
+		// scan all partitions for this topic.
+		if len(pids) == 0 {
+			// Scan actual Stream data keys (gmq:stream:{topic}:{partition})
 			pIter := s.redisClient.Scan(ctx, 0, fmt.Sprintf("gmq:stream:%s:*", t), 0).Iterator()
 			for pIter.Next(ctx) {
-				parts := strings.Split(pIter.Val(), ":")
-				if pid, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+				pKey := pIter.Val()
+				pParts := strings.Split(pKey, ":")
+				if pid, err := strconv.Atoi(pParts[len(pParts)-1]); err == nil {
 					pids = append(pids, int32(pid))
 				}
 			}
@@ -526,13 +569,18 @@ func (s *AdminServer) handleMessages(w http.ResponseWriter, r *http.Request) {
 				payload := ""
 				if data, ok := msg.Values["d"].(string); ok {
 					payload = data
+				} else if data, ok := msg.Values["d"].([]byte); ok {
+					payload = string(data)
 				}
 
 				parts := strings.Split(msg.ID, "-")
 				ts, _ := strconv.ParseInt(parts[0], 10, 64)
 
 				result = append(result, MessageResp{
+					Topic:       t,
+					PartitionID: pid,
 					Offset:      offset,
+					MsgID:       msg.ID,
 					Payload:     payload,
 					PayloadSize: len(payload),
 					Timestamp:   ts,

@@ -463,7 +463,7 @@ func WithPartitionKey(key string) PublishOption {
 }
 
 func WithPartitionID(id int32) PublishOption {
-	return func(req *pb.PublishItem) { req.PartitionId = id }
+	return func(req *pb.PublishItem) { req.PartitionId = &id }
 }
 
 func WithProperties(props map[string]string) PublishOption {

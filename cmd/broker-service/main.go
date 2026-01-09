@@ -312,25 +312,27 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 		msgID := xid.New().String()
 		partID := item.PartitionId
 
-		if partID < 0 {
+		if partID == nil || *partID < 0 {
 			if item.PartitionKey != "" {
 				h := fnv.New32a()
 				h.Write([]byte(item.PartitionKey))
-				partID = int32(h.Sum32() % uint32(s.partitions))
+				pid := int32(h.Sum32() % uint32(s.partitions))
+				partID = &pid
 			} else {
-				partID = rand.Int31n(s.partitions)
+				pid := rand.Int31n(s.partitions)
+				partID = &pid
 			}
 		}
 
 		storageMsgs[i] = &storagepb.Message{
 			Topic:       item.Topic,
-			PartitionId: partID,
+			PartitionId: *partID,
 			Payload:     item.Payload,
 		}
 		results[i] = &pb.PublishResult{
 			MessageId:   msgID,
 			Topic:       item.Topic,
-			PartitionId: partID,
+			PartitionId: *partID,
 			Success:     true,
 		}
 	}

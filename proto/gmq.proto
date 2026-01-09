@@ -72,7 +72,7 @@ message PublishItem {
   // Partition key (used to determine partition)
   string partition_key = 2;
   // Specify partition ID (optional, priority higher than partition_key)
-  int32 partition_id = 3;
+  optional int32 partition_id = 3;
   // Message body
   bytes payload = 4;
   // Message properties
