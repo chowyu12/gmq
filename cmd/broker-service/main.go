@@ -184,7 +184,11 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 	assignResp, err := s.storageClient.GetGroupAssignment(ctx, &storagepb.GetGroupAssignmentRequest{
 		ConsumerGroup: group, Topic: topic,
 	})
-	if err != nil || !assignResp.Success {
+	if err != nil {
+		log.WithContext(ctx).Error("GetGroupAssignment failed", "error", err, "group", group, "topic", topic)
+		return
+	}
+	if !assignResp.Success {
 		return
 	}
 
@@ -217,7 +221,11 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 			ConsumerId:    consumerID,
 			Limit:         limit,
 		})
-		if err == nil && resp != nil && len(resp.Messages) > 0 {
+		if err != nil {
+			log.WithContext(ctx).Error("FetchMessages failed", "error", err, "topic", topic, "partition", partID)
+			continue
+		}
+		if resp != nil && len(resp.Messages) > 0 {
 			for _, m := range resp.Messages {
 				allItems = append(allItems, &pb.MessageItem{
 					Topic:       m.Topic,
@@ -236,9 +244,13 @@ func (s *BrokerServer) handlePull(ctx context.Context, stream pb.GMQService_Stre
 
 	// Try XCLAIM
 	for _, partID := range myPartitions {
-		claimResp, _ := s.storageClient.ClaimMessages(ctx, &storagepb.ClaimMessagesRequest{
+		claimResp, err := s.storageClient.ClaimMessages(ctx, &storagepb.ClaimMessagesRequest{
 			Topic: topic, PartitionId: partID, ConsumerGroup: group, ConsumerId: consumerID, MinIdleTimeMs: 10000, Limit: limit,
 		})
+		if err != nil {
+			log.WithContext(ctx).Error("ClaimMessages failed", "error", err, "topic", topic, "partition", partID)
+			continue
+		}
 		if claimResp != nil && len(claimResp.Messages) > 0 {
 			var items []*pb.MessageItem
 			for _, m := range claimResp.Messages {
@@ -288,12 +300,15 @@ func (s *BrokerServer) handleAck(ctx context.Context, stream pb.GMQService_Strea
 
 	for topic, partitions := range ackGroups {
 		for partID, offsets := range partitions {
-			s.storageClient.AcknowledgeMessages(ctx, &storagepb.AcknowledgeMessagesRequest{
+			_, err := s.storageClient.AcknowledgeMessages(ctx, &storagepb.AcknowledgeMessagesRequest{
 				Topic:         topic,
 				PartitionId:   partID,
 				ConsumerGroup: group,
 				Offsets:       offsets,
 			})
+			if err != nil {
+				log.WithContext(ctx).Error("AcknowledgeMessages failed", "error", err, "topic", topic, "partition", partID)
+			}
 		}
 	}
 
@@ -336,7 +351,14 @@ func (s *BrokerServer) handlePublish(ctx context.Context, stream pb.GMQService_S
 			Success:     true,
 		}
 	}
-	s.storageClient.WriteMessages(ctx, &storagepb.WriteMessagesRequest{Messages: storageMsgs})
+	_, err := s.storageClient.WriteMessages(ctx, &storagepb.WriteMessagesRequest{Messages: storageMsgs})
+	if err != nil {
+		log.WithContext(ctx).Error("WriteMessages failed", "error", err)
+		for i := range results {
+			results[i].Success = false
+			results[i].ErrorMessage = err.Error()
+		}
+	}
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_PUBLISH_RESPONSE,
 		Payload: &pb.StreamMessage_PublishResp{
@@ -349,7 +371,7 @@ func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService
 	if req.ConsumerId == "" || req.ConsumerGroup == "" {
 		return
 	}
-	s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
+	_, err := s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
 		Consumer: &storagepb.ConsumerState{
 			ConsumerId:    req.ConsumerId,
 			ConsumerGroup: req.ConsumerGroup,
@@ -357,6 +379,17 @@ func (s *BrokerServer) handleSubscribe(ctx context.Context, stream pb.GMQService
 			LastHeartbeat: time.Now().Unix(),
 		},
 	})
+	if err != nil {
+		log.WithContext(ctx).Error("SaveConsumer failed in handleSubscribe", "error", err, "consumerId", req.ConsumerId)
+		// return error to client
+		stream.Send(&pb.StreamMessage{
+			Type: pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_RESPONSE,
+			Payload: &pb.StreamMessage_SubscribeResp{
+				SubscribeResp: &pb.SubscribeResponse{RequestId: req.RequestId, Success: false, ErrorMessage: err.Error()},
+			},
+		})
+		return
+	}
 	s.rebalance(ctx, req.ConsumerGroup, req.Topic)
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_SUBSCRIBE_RESPONSE,
@@ -370,13 +403,16 @@ func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService
 	if consumerID == "" || group == "" {
 		return
 	}
-	s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
+	_, err := s.storageClient.SaveConsumer(ctx, &storagepb.SaveConsumerRequest{
 		Consumer: &storagepb.ConsumerState{
 			ConsumerId:    consumerID,
 			ConsumerGroup: group,
 			LastHeartbeat: time.Now().Unix(),
 		},
 	})
+	if err != nil {
+		log.WithContext(ctx).Error("SaveConsumer failed in handleHeartbeat", "error", err, "consumerId", consumerID)
+	}
 	stream.Send(&pb.StreamMessage{
 		Type: pb.MessageType_MESSAGE_TYPE_HEARTBEAT_RESPONSE,
 		Payload: &pb.StreamMessage_HeartbeatResp{
@@ -386,10 +422,14 @@ func (s *BrokerServer) handleHeartbeat(ctx context.Context, stream pb.GMQService
 }
 
 func (s *BrokerServer) rebalance(ctx context.Context, group, topic string) {
-	resp, _ := s.storageClient.GetConsumers(ctx, &storagepb.GetConsumersRequest{
+	resp, err := s.storageClient.GetConsumers(ctx, &storagepb.GetConsumersRequest{
 		ConsumerGroup: group,
 		Topic:         topic,
 	})
+	if err != nil {
+		log.WithContext(ctx).Error("GetConsumers failed in rebalance", "error", err, "group", group, "topic", topic)
+		return
+	}
 	if resp == nil || len(resp.Consumers) == 0 {
 		return
 	}
@@ -407,24 +447,35 @@ func (s *BrokerServer) rebalance(ctx context.Context, group, topic string) {
 	for i := int32(0); i < s.partitions; i++ {
 		assign[i] = activeConsumers[int(i)%len(activeConsumers)].ConsumerId
 	}
-	s.storageClient.UpdateGroupAssignment(ctx, &storagepb.UpdateGroupAssignmentRequest{
+	_, err = s.storageClient.UpdateGroupAssignment(ctx, &storagepb.UpdateGroupAssignmentRequest{
 		ConsumerGroup:       group,
 		Topic:               topic,
 		PartitionAssignment: assign,
 	})
+	if err != nil {
+		log.WithContext(ctx).Error("UpdateGroupAssignment failed in rebalance", "error", err, "group", group, "topic", topic)
+	}
 }
 
 func main() {
 	flag.Parse()
 	log.Init(*logLevel)
 	rand.Seed(time.Now().UnixNano())
-	conn, _ := grpc.Dial(*storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(*storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Error("Failed to connect to storage service", "error", err, "addr", *storageAddr)
+		os.Exit(1)
+	}
 	storage := storagepb.NewStorageServiceClient(conn)
 	srv := grpc.NewServer()
 	// Pass Redis address for pub/sub notifications
 	brokerServer := NewBrokerServer(storage, int32(*defaultPartitions), "localhost:6379")
 	pb.RegisterGMQServiceServer(srv, brokerServer)
-	l, _ := net.Listen("tcp", *addr)
+	l, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Error("Failed to listen", "error", err, "addr", *addr)
+		os.Exit(1)
+	}
 	log.Info("Broker started", "addr", *addr)
 	go srv.Serve(l)
 	c := make(chan os.Signal, 1)
