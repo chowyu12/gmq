@@ -14,10 +14,15 @@ import (
 
 // RedisStorage implements storage using Redis/DragonflyDB
 type RedisStorage struct {
-	client *redis.Client
+	client    *redis.Client
+	globalTTL time.Duration
 }
 
-func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error) {
+func NewRedisStorage(addr string, password string, db int, globalTTL time.Duration) (*RedisStorage, error) {
+	if globalTTL < 0 {
+		return nil, fmt.Errorf("global TTL must be greater than or equal to 0")
+	}
+
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: password,
@@ -34,7 +39,10 @@ func NewRedisStorage(addr string, password string, db int) (*RedisStorage, error
 		return nil, fmt.Errorf("failed to connect to DragonflyDB: %w", err)
 	}
 
-	return &RedisStorage{client: client}, nil
+	return &RedisStorage{
+		client:    client,
+		globalTTL: globalTTL,
+	}, nil
 }
 
 // --- Message operations (using Redis Streams) ---
@@ -71,17 +79,6 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 		return nil, nil
 	}
 
-	// 1. Get TTL configuration for all topics (batch optimization)
-	// This logic can be further optimized, currently using simple loop or cache
-	topicTTLs := make(map[string]float64)
-	for _, msg := range msgs {
-		if _, ok := topicTTLs[msg.Topic]; !ok {
-			ttlKey := fmt.Sprintf("gmq:meta:ttl:%s", msg.Topic)
-			ttlVal, _ := r.client.Get(ctx, ttlKey).Float64()
-			topicTTLs[msg.Topic] = ttlVal
-		}
-	}
-
 	// 2. Prepare Pipeline
 	pipe := r.client.Pipeline()
 	results := make([]*redis.StringCmd, len(msgs))
@@ -97,6 +94,15 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 			MaxLen: 1000000,
 			Approx: true,
 		}
+
+		// Apply Global TTL
+		if r.globalTTL > 0 {
+			// Redis Stream MinID allows automatic cleanup of old messages by timestamp
+			// Redis ID is timestamp-sequence, so we can calculate MinID as (now - TTL)
+			minID := time.Now().Add(-r.globalTTL).UnixMilli()
+			args.MinID = fmt.Sprintf("%d-0", minID)
+		}
+
 		results[i] = pipe.XAdd(ctx, args)
 
 		// 4. Publish a notification to Redis Pub/Sub so Brokers can react immediately
@@ -261,14 +267,7 @@ func (r *RedisStorage) ClaimMessages(ctx context.Context, group, topic, consumer
 	return messages, nil
 }
 
-// --- TTL management ---
-
-func (r *RedisStorage) SetTTL(ctx context.Context, topic string, ttl time.Duration) error {
-	// Redis Stream expiration is usually implemented via XADD MAXLEN or setting Key EXPIRE
-	// Here we record metadata, actual cleanup can be done automatically via MAXLEN during writes
-	key := fmt.Sprintf("gmq:meta:ttl:%s", topic)
-	return r.client.Set(ctx, key, ttl.Seconds(), 0).Err()
-}
+// --- Partition operations ---
 
 func (r *RedisStorage) CreatePartition(ctx context.Context, topic string, partitionID int32) error {
 	// Redis Stream is automatically created on first XADD, here we can do some metadata recording

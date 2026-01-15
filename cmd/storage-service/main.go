@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	addr      = flag.String("addr", ":50052", "Storage service listen address")
-	redisAddr = flag.String("redis-addr", "localhost:6379", "Redis/DragonflyDB address")
-	redisPass = flag.String("redis-pass", "", "Redis password")
-	logLevel  = flag.String("log-level", "info", "Log level: debug, info, warn, error")
+	addr       = flag.String("addr", ":50052", "Storage service listen address")
+	redisAddr  = flag.String("redis-addr", "localhost:6379", "Redis/DragonflyDB address")
+	redisPass  = flag.String("redis-pass", "", "Redis password")
+	logLevel   = flag.String("log-level", "info", "Log level: debug, info, warn, error")
+	defaultTTL = flag.Duration("default-ttl", 7*24*time.Hour, "Default message TTL (e.g. 168h, 24h, 1h)")
 )
 
 // StorageServer implements the storage service
@@ -143,14 +144,6 @@ func (s *StorageServer) ListPartitions(ctx context.Context, req *pb.ListPartitio
 	return &pb.ListPartitionsResponse{Partitions: pbPartitions, Success: true}, nil
 }
 
-func (s *StorageServer) SetTTL(ctx context.Context, req *pb.SetTTLRequest) (*pb.SetTTLResponse, error) {
-	err := s.store.SetTTL(ctx, req.Topic, time.Duration(req.TtlSeconds)*time.Second)
-	if err != nil {
-		return &pb.SetTTLResponse{Success: false, ErrorMessage: err.Error()}, nil
-	}
-	return &pb.SetTTLResponse{Success: true}, nil
-}
-
 // --- State management interface implementation ---
 
 func (s *StorageServer) SaveConsumer(ctx context.Context, req *pb.SaveConsumerRequest) (*pb.SaveConsumerResponse, error) {
@@ -215,9 +208,9 @@ func main() {
 	flag.Parse()
 	log.Init(*logLevel)
 
-	log.Info("Starting Storage Service", "engine", "Redis/DragonflyDB")
+	log.Info("Starting Storage Service", "engine", "Redis/DragonflyDB", "ttl", *defaultTTL)
 
-	store, err := storage.NewRedisStorage(*redisAddr, *redisPass, 0)
+	store, err := storage.NewRedisStorage(*redisAddr, *redisPass, 0, *defaultTTL)
 	if err != nil {
 		log.Error("Failed to initialize storage", "error", err)
 		os.Exit(1)

@@ -11,7 +11,6 @@ service StorageService {
   rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse);
   rpc GetPartition(GetPartitionRequest) returns (GetPartitionResponse);
   rpc ListPartitions(ListPartitionsRequest) returns (ListPartitionsResponse);
-  rpc SetTTL(SetTTLRequest) returns (SetTTLResponse);
 
   // --- Consumer and consumer group state management (strong consistency storage) ---
   
@@ -134,16 +133,6 @@ message ListPartitionsResponse {
   repeated PartitionInfo partitions = 1;
   bool success = 2;
   string error_message = 3;
-}
-
-message SetTTLRequest {
-  string topic = 1;
-  int64 ttl_seconds = 2;
-}
-
-message SetTTLResponse {
-  bool success = 1;
-  string error_message = 2;
 }
 
 // --- Consumer management related messages ---

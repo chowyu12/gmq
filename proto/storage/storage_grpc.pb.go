@@ -23,7 +23,6 @@ const (
 	StorageService_CreatePartition_FullMethodName       = "/storage.StorageService/CreatePartition"
 	StorageService_GetPartition_FullMethodName          = "/storage.StorageService/GetPartition"
 	StorageService_ListPartitions_FullMethodName        = "/storage.StorageService/ListPartitions"
-	StorageService_SetTTL_FullMethodName                = "/storage.StorageService/SetTTL"
 	StorageService_SaveConsumer_FullMethodName          = "/storage.StorageService/SaveConsumer"
 	StorageService_GetConsumers_FullMethodName          = "/storage.StorageService/GetConsumers"
 	StorageService_DeleteConsumer_FullMethodName        = "/storage.StorageService/DeleteConsumer"
@@ -45,7 +44,6 @@ type StorageServiceClient interface {
 	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
 	GetPartition(ctx context.Context, in *GetPartitionRequest, opts ...grpc.CallOption) (*GetPartitionResponse, error)
 	ListPartitions(ctx context.Context, in *ListPartitionsRequest, opts ...grpc.CallOption) (*ListPartitionsResponse, error)
-	SetTTL(ctx context.Context, in *SetTTLRequest, opts ...grpc.CallOption) (*SetTTLResponse, error)
 	// Save/update consumer information
 	SaveConsumer(ctx context.Context, in *SaveConsumerRequest, opts ...grpc.CallOption) (*SaveConsumerResponse, error)
 	// Get all consumers in a consumer group
@@ -106,16 +104,6 @@ func (c *storageServiceClient) ListPartitions(ctx context.Context, in *ListParti
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListPartitionsResponse)
 	err := c.cc.Invoke(ctx, StorageService_ListPartitions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *storageServiceClient) SetTTL(ctx context.Context, in *SetTTLRequest, opts ...grpc.CallOption) (*SetTTLResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SetTTLResponse)
-	err := c.cc.Invoke(ctx, StorageService_SetTTL_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +201,6 @@ type StorageServiceServer interface {
 	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
 	GetPartition(context.Context, *GetPartitionRequest) (*GetPartitionResponse, error)
 	ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error)
-	SetTTL(context.Context, *SetTTLRequest) (*SetTTLResponse, error)
 	// Save/update consumer information
 	SaveConsumer(context.Context, *SaveConsumerRequest) (*SaveConsumerResponse, error)
 	// Get all consumers in a consumer group
@@ -251,9 +238,6 @@ func (UnimplementedStorageServiceServer) GetPartition(context.Context, *GetParti
 }
 func (UnimplementedStorageServiceServer) ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPartitions not implemented")
-}
-func (UnimplementedStorageServiceServer) SetTTL(context.Context, *SetTTLRequest) (*SetTTLResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetTTL not implemented")
 }
 func (UnimplementedStorageServiceServer) SaveConsumer(context.Context, *SaveConsumerRequest) (*SaveConsumerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveConsumer not implemented")
@@ -368,24 +352,6 @@ func _StorageService_ListPartitions_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(StorageServiceServer).ListPartitions(ctx, req.(*ListPartitionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _StorageService_SetTTL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetTTLRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StorageServiceServer).SetTTL(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: StorageService_SetTTL_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServiceServer).SetTTL(ctx, req.(*SetTTLRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -556,10 +522,6 @@ var StorageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListPartitions",
 			Handler:    _StorageService_ListPartitions_Handler,
-		},
-		{
-			MethodName: "SetTTL",
-			Handler:    _StorageService_SetTTL_Handler,
 		},
 		{
 			MethodName: "SaveConsumer",

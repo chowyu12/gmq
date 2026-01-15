@@ -45,9 +45,6 @@ type Storage interface {
 	AcknowledgeMessages(ctx context.Context, consumerGroup, topic string, partitionID int32, offsets []int64) (int64, error)
 	ClaimMessages(ctx context.Context, consumerGroup, topic, consumerID string, partitionID int32, minIdleTime time.Duration, limit int) ([]*Message, error)
 
-	// --- TTL management ---
-	SetTTL(ctx context.Context, topic string, ttl time.Duration) error
-
 	// --- State management ---
 	SaveConsumer(ctx context.Context, state *ConsumerState) error
 	GetConsumers(ctx context.Context, group, topic string) ([]*ConsumerState, error)

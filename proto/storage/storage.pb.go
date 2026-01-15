@@ -990,110 +990,6 @@ func (x *ListPartitionsResponse) GetErrorMessage() string {
 	return ""
 }
 
-type SetTTLRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	TtlSeconds    int64                  `protobuf:"varint,2,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetTTLRequest) Reset() {
-	*x = SetTTLRequest{}
-	mi := &file_proto_storage_storage_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetTTLRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetTTLRequest) ProtoMessage() {}
-
-func (x *SetTTLRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetTTLRequest.ProtoReflect.Descriptor instead.
-func (*SetTTLRequest) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *SetTTLRequest) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
-}
-
-func (x *SetTTLRequest) GetTtlSeconds() int64 {
-	if x != nil {
-		return x.TtlSeconds
-	}
-	return 0
-}
-
-type SetTTLResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetTTLResponse) Reset() {
-	*x = SetTTLResponse{}
-	mi := &file_proto_storage_storage_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetTTLResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetTTLResponse) ProtoMessage() {}
-
-func (x *SetTTLResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetTTLResponse.ProtoReflect.Descriptor instead.
-func (*SetTTLResponse) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *SetTTLResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *SetTTLResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
 type ConsumerState struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ConsumerId         string                 `protobuf:"bytes,1,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
@@ -1107,7 +1003,7 @@ type ConsumerState struct {
 
 func (x *ConsumerState) Reset() {
 	*x = ConsumerState{}
-	mi := &file_proto_storage_storage_proto_msgTypes[18]
+	mi := &file_proto_storage_storage_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1119,7 +1015,7 @@ func (x *ConsumerState) String() string {
 func (*ConsumerState) ProtoMessage() {}
 
 func (x *ConsumerState) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[18]
+	mi := &file_proto_storage_storage_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1132,7 +1028,7 @@ func (x *ConsumerState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumerState.ProtoReflect.Descriptor instead.
 func (*ConsumerState) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{18}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ConsumerState) GetConsumerId() string {
@@ -1179,7 +1075,7 @@ type SaveConsumerRequest struct {
 
 func (x *SaveConsumerRequest) Reset() {
 	*x = SaveConsumerRequest{}
-	mi := &file_proto_storage_storage_proto_msgTypes[19]
+	mi := &file_proto_storage_storage_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1191,7 +1087,7 @@ func (x *SaveConsumerRequest) String() string {
 func (*SaveConsumerRequest) ProtoMessage() {}
 
 func (x *SaveConsumerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[19]
+	mi := &file_proto_storage_storage_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1204,7 +1100,7 @@ func (x *SaveConsumerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveConsumerRequest.ProtoReflect.Descriptor instead.
 func (*SaveConsumerRequest) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{19}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SaveConsumerRequest) GetConsumer() *ConsumerState {
@@ -1224,7 +1120,7 @@ type SaveConsumerResponse struct {
 
 func (x *SaveConsumerResponse) Reset() {
 	*x = SaveConsumerResponse{}
-	mi := &file_proto_storage_storage_proto_msgTypes[20]
+	mi := &file_proto_storage_storage_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1236,7 +1132,7 @@ func (x *SaveConsumerResponse) String() string {
 func (*SaveConsumerResponse) ProtoMessage() {}
 
 func (x *SaveConsumerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[20]
+	mi := &file_proto_storage_storage_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1249,7 +1145,7 @@ func (x *SaveConsumerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveConsumerResponse.ProtoReflect.Descriptor instead.
 func (*SaveConsumerResponse) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{20}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SaveConsumerResponse) GetSuccess() bool {
@@ -1276,7 +1172,7 @@ type GetConsumersRequest struct {
 
 func (x *GetConsumersRequest) Reset() {
 	*x = GetConsumersRequest{}
-	mi := &file_proto_storage_storage_proto_msgTypes[21]
+	mi := &file_proto_storage_storage_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1288,7 +1184,7 @@ func (x *GetConsumersRequest) String() string {
 func (*GetConsumersRequest) ProtoMessage() {}
 
 func (x *GetConsumersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[21]
+	mi := &file_proto_storage_storage_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1301,7 +1197,7 @@ func (x *GetConsumersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConsumersRequest.ProtoReflect.Descriptor instead.
 func (*GetConsumersRequest) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{21}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetConsumersRequest) GetConsumerGroup() string {
@@ -1329,7 +1225,7 @@ type GetConsumersResponse struct {
 
 func (x *GetConsumersResponse) Reset() {
 	*x = GetConsumersResponse{}
-	mi := &file_proto_storage_storage_proto_msgTypes[22]
+	mi := &file_proto_storage_storage_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1341,7 +1237,7 @@ func (x *GetConsumersResponse) String() string {
 func (*GetConsumersResponse) ProtoMessage() {}
 
 func (x *GetConsumersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[22]
+	mi := &file_proto_storage_storage_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1354,7 +1250,7 @@ func (x *GetConsumersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConsumersResponse.ProtoReflect.Descriptor instead.
 func (*GetConsumersResponse) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{22}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetConsumersResponse) GetConsumers() []*ConsumerState {
@@ -1389,7 +1285,7 @@ type DeleteConsumerRequest struct {
 
 func (x *DeleteConsumerRequest) Reset() {
 	*x = DeleteConsumerRequest{}
-	mi := &file_proto_storage_storage_proto_msgTypes[23]
+	mi := &file_proto_storage_storage_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1401,7 +1297,7 @@ func (x *DeleteConsumerRequest) String() string {
 func (*DeleteConsumerRequest) ProtoMessage() {}
 
 func (x *DeleteConsumerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[23]
+	mi := &file_proto_storage_storage_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1414,7 +1310,7 @@ func (x *DeleteConsumerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConsumerRequest.ProtoReflect.Descriptor instead.
 func (*DeleteConsumerRequest) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{23}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DeleteConsumerRequest) GetConsumerId() string {
@@ -1448,7 +1344,7 @@ type DeleteConsumerResponse struct {
 
 func (x *DeleteConsumerResponse) Reset() {
 	*x = DeleteConsumerResponse{}
-	mi := &file_proto_storage_storage_proto_msgTypes[24]
+	mi := &file_proto_storage_storage_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1460,7 +1356,7 @@ func (x *DeleteConsumerResponse) String() string {
 func (*DeleteConsumerResponse) ProtoMessage() {}
 
 func (x *DeleteConsumerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[24]
+	mi := &file_proto_storage_storage_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1473,7 +1369,7 @@ func (x *DeleteConsumerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConsumerResponse.ProtoReflect.Descriptor instead.
 func (*DeleteConsumerResponse) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{24}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DeleteConsumerResponse) GetSuccess() bool {
@@ -1501,7 +1397,7 @@ type UpdateGroupAssignmentRequest struct {
 
 func (x *UpdateGroupAssignmentRequest) Reset() {
 	*x = UpdateGroupAssignmentRequest{}
-	mi := &file_proto_storage_storage_proto_msgTypes[25]
+	mi := &file_proto_storage_storage_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1513,7 +1409,7 @@ func (x *UpdateGroupAssignmentRequest) String() string {
 func (*UpdateGroupAssignmentRequest) ProtoMessage() {}
 
 func (x *UpdateGroupAssignmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[25]
+	mi := &file_proto_storage_storage_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1526,7 +1422,7 @@ func (x *UpdateGroupAssignmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGroupAssignmentRequest.ProtoReflect.Descriptor instead.
 func (*UpdateGroupAssignmentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{25}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateGroupAssignmentRequest) GetConsumerGroup() string {
@@ -1560,7 +1456,7 @@ type UpdateGroupAssignmentResponse struct {
 
 func (x *UpdateGroupAssignmentResponse) Reset() {
 	*x = UpdateGroupAssignmentResponse{}
-	mi := &file_proto_storage_storage_proto_msgTypes[26]
+	mi := &file_proto_storage_storage_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1572,7 +1468,7 @@ func (x *UpdateGroupAssignmentResponse) String() string {
 func (*UpdateGroupAssignmentResponse) ProtoMessage() {}
 
 func (x *UpdateGroupAssignmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[26]
+	mi := &file_proto_storage_storage_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1585,7 +1481,7 @@ func (x *UpdateGroupAssignmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGroupAssignmentResponse.ProtoReflect.Descriptor instead.
 func (*UpdateGroupAssignmentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{26}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UpdateGroupAssignmentResponse) GetSuccess() bool {
@@ -1612,7 +1508,7 @@ type GetGroupAssignmentRequest struct {
 
 func (x *GetGroupAssignmentRequest) Reset() {
 	*x = GetGroupAssignmentRequest{}
-	mi := &file_proto_storage_storage_proto_msgTypes[27]
+	mi := &file_proto_storage_storage_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1624,7 +1520,7 @@ func (x *GetGroupAssignmentRequest) String() string {
 func (*GetGroupAssignmentRequest) ProtoMessage() {}
 
 func (x *GetGroupAssignmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[27]
+	mi := &file_proto_storage_storage_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1637,7 +1533,7 @@ func (x *GetGroupAssignmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGroupAssignmentRequest.ProtoReflect.Descriptor instead.
 func (*GetGroupAssignmentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{27}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetGroupAssignmentRequest) GetConsumerGroup() string {
@@ -1665,7 +1561,7 @@ type GetGroupAssignmentResponse struct {
 
 func (x *GetGroupAssignmentResponse) Reset() {
 	*x = GetGroupAssignmentResponse{}
-	mi := &file_proto_storage_storage_proto_msgTypes[28]
+	mi := &file_proto_storage_storage_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1677,7 +1573,7 @@ func (x *GetGroupAssignmentResponse) String() string {
 func (*GetGroupAssignmentResponse) ProtoMessage() {}
 
 func (x *GetGroupAssignmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_storage_storage_proto_msgTypes[28]
+	mi := &file_proto_storage_storage_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1690,7 +1586,7 @@ func (x *GetGroupAssignmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGroupAssignmentResponse.ProtoReflect.Descriptor instead.
 func (*GetGroupAssignmentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_storage_storage_proto_rawDescGZIP(), []int{28}
+	return file_proto_storage_storage_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetGroupAssignmentResponse) GetPartitionAssignment() map[int32]string {
@@ -1790,14 +1686,7 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"partitions\x18\x01 \x03(\v2\x16.storage.PartitionInfoR\n" +
 	"partitions\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\"F\n" +
-	"\rSetTTLRequest\x12\x14\n" +
-	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1f\n" +
-	"\vttl_seconds\x18\x02 \x01(\x03R\n" +
-	"ttlSeconds\"O\n" +
-	"\x0eSetTTLResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"\xc5\x01\n" +
+	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\"\xc5\x01\n" +
 	"\rConsumerState\x12\x1f\n" +
 	"\vconsumer_id\x18\x01 \x01(\tR\n" +
 	"consumerId\x12%\n" +
@@ -1844,13 +1733,12 @@ const file_proto_storage_storage_proto_rawDesc = "" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x1aF\n" +
 	"\x18PartitionAssignmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xc7\b\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\x8c\b\n" +
 	"\x0eStorageService\x12N\n" +
 	"\rWriteMessages\x12\x1d.storage.WriteMessagesRequest\x1a\x1e.storage.WriteMessagesResponse\x12T\n" +
 	"\x0fCreatePartition\x12\x1f.storage.CreatePartitionRequest\x1a .storage.CreatePartitionResponse\x12K\n" +
 	"\fGetPartition\x12\x1c.storage.GetPartitionRequest\x1a\x1d.storage.GetPartitionResponse\x12Q\n" +
-	"\x0eListPartitions\x12\x1e.storage.ListPartitionsRequest\x1a\x1f.storage.ListPartitionsResponse\x129\n" +
-	"\x06SetTTL\x12\x16.storage.SetTTLRequest\x1a\x17.storage.SetTTLResponse\x12K\n" +
+	"\x0eListPartitions\x12\x1e.storage.ListPartitionsRequest\x1a\x1f.storage.ListPartitionsResponse\x12K\n" +
 	"\fSaveConsumer\x12\x1c.storage.SaveConsumerRequest\x1a\x1d.storage.SaveConsumerResponse\x12K\n" +
 	"\fGetConsumers\x12\x1c.storage.GetConsumersRequest\x1a\x1d.storage.GetConsumersResponse\x12Q\n" +
 	"\x0eDeleteConsumer\x12\x1e.storage.DeleteConsumerRequest\x1a\x1f.storage.DeleteConsumerResponse\x12f\n" +
@@ -1872,7 +1760,7 @@ func file_proto_storage_storage_proto_rawDescGZIP() []byte {
 	return file_proto_storage_storage_proto_rawDescData
 }
 
-var file_proto_storage_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_proto_storage_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_proto_storage_storage_proto_goTypes = []any{
 	(*ClaimMessagesRequest)(nil),          // 0: storage.ClaimMessagesRequest
 	(*ClaimMessagesResponse)(nil),         // 1: storage.ClaimMessagesResponse
@@ -1890,21 +1778,19 @@ var file_proto_storage_storage_proto_goTypes = []any{
 	(*GetPartitionResponse)(nil),          // 13: storage.GetPartitionResponse
 	(*ListPartitionsRequest)(nil),         // 14: storage.ListPartitionsRequest
 	(*ListPartitionsResponse)(nil),        // 15: storage.ListPartitionsResponse
-	(*SetTTLRequest)(nil),                 // 16: storage.SetTTLRequest
-	(*SetTTLResponse)(nil),                // 17: storage.SetTTLResponse
-	(*ConsumerState)(nil),                 // 18: storage.ConsumerState
-	(*SaveConsumerRequest)(nil),           // 19: storage.SaveConsumerRequest
-	(*SaveConsumerResponse)(nil),          // 20: storage.SaveConsumerResponse
-	(*GetConsumersRequest)(nil),           // 21: storage.GetConsumersRequest
-	(*GetConsumersResponse)(nil),          // 22: storage.GetConsumersResponse
-	(*DeleteConsumerRequest)(nil),         // 23: storage.DeleteConsumerRequest
-	(*DeleteConsumerResponse)(nil),        // 24: storage.DeleteConsumerResponse
-	(*UpdateGroupAssignmentRequest)(nil),  // 25: storage.UpdateGroupAssignmentRequest
-	(*UpdateGroupAssignmentResponse)(nil), // 26: storage.UpdateGroupAssignmentResponse
-	(*GetGroupAssignmentRequest)(nil),     // 27: storage.GetGroupAssignmentRequest
-	(*GetGroupAssignmentResponse)(nil),    // 28: storage.GetGroupAssignmentResponse
-	nil,                                   // 29: storage.UpdateGroupAssignmentRequest.PartitionAssignmentEntry
-	nil,                                   // 30: storage.GetGroupAssignmentResponse.PartitionAssignmentEntry
+	(*ConsumerState)(nil),                 // 16: storage.ConsumerState
+	(*SaveConsumerRequest)(nil),           // 17: storage.SaveConsumerRequest
+	(*SaveConsumerResponse)(nil),          // 18: storage.SaveConsumerResponse
+	(*GetConsumersRequest)(nil),           // 19: storage.GetConsumersRequest
+	(*GetConsumersResponse)(nil),          // 20: storage.GetConsumersResponse
+	(*DeleteConsumerRequest)(nil),         // 21: storage.DeleteConsumerRequest
+	(*DeleteConsumerResponse)(nil),        // 22: storage.DeleteConsumerResponse
+	(*UpdateGroupAssignmentRequest)(nil),  // 23: storage.UpdateGroupAssignmentRequest
+	(*UpdateGroupAssignmentResponse)(nil), // 24: storage.UpdateGroupAssignmentResponse
+	(*GetGroupAssignmentRequest)(nil),     // 25: storage.GetGroupAssignmentRequest
+	(*GetGroupAssignmentResponse)(nil),    // 26: storage.GetGroupAssignmentResponse
+	nil,                                   // 27: storage.UpdateGroupAssignmentRequest.PartitionAssignmentEntry
+	nil,                                   // 28: storage.GetGroupAssignmentResponse.PartitionAssignmentEntry
 }
 var file_proto_storage_storage_proto_depIdxs = []int32{
 	6,  // 0: storage.ClaimMessagesResponse.messages:type_name -> storage.Message
@@ -1912,38 +1798,36 @@ var file_proto_storage_storage_proto_depIdxs = []int32{
 	6,  // 2: storage.WriteMessagesRequest.messages:type_name -> storage.Message
 	12, // 3: storage.GetPartitionResponse.partition:type_name -> storage.PartitionInfo
 	12, // 4: storage.ListPartitionsResponse.partitions:type_name -> storage.PartitionInfo
-	18, // 5: storage.SaveConsumerRequest.consumer:type_name -> storage.ConsumerState
-	18, // 6: storage.GetConsumersResponse.consumers:type_name -> storage.ConsumerState
-	29, // 7: storage.UpdateGroupAssignmentRequest.partition_assignment:type_name -> storage.UpdateGroupAssignmentRequest.PartitionAssignmentEntry
-	30, // 8: storage.GetGroupAssignmentResponse.partition_assignment:type_name -> storage.GetGroupAssignmentResponse.PartitionAssignmentEntry
+	16, // 5: storage.SaveConsumerRequest.consumer:type_name -> storage.ConsumerState
+	16, // 6: storage.GetConsumersResponse.consumers:type_name -> storage.ConsumerState
+	27, // 7: storage.UpdateGroupAssignmentRequest.partition_assignment:type_name -> storage.UpdateGroupAssignmentRequest.PartitionAssignmentEntry
+	28, // 8: storage.GetGroupAssignmentResponse.partition_assignment:type_name -> storage.GetGroupAssignmentResponse.PartitionAssignmentEntry
 	7,  // 9: storage.StorageService.WriteMessages:input_type -> storage.WriteMessagesRequest
 	9,  // 10: storage.StorageService.CreatePartition:input_type -> storage.CreatePartitionRequest
 	11, // 11: storage.StorageService.GetPartition:input_type -> storage.GetPartitionRequest
 	14, // 12: storage.StorageService.ListPartitions:input_type -> storage.ListPartitionsRequest
-	16, // 13: storage.StorageService.SetTTL:input_type -> storage.SetTTLRequest
-	19, // 14: storage.StorageService.SaveConsumer:input_type -> storage.SaveConsumerRequest
-	21, // 15: storage.StorageService.GetConsumers:input_type -> storage.GetConsumersRequest
-	23, // 16: storage.StorageService.DeleteConsumer:input_type -> storage.DeleteConsumerRequest
-	25, // 17: storage.StorageService.UpdateGroupAssignment:input_type -> storage.UpdateGroupAssignmentRequest
-	27, // 18: storage.StorageService.GetGroupAssignment:input_type -> storage.GetGroupAssignmentRequest
-	2,  // 19: storage.StorageService.FetchMessages:input_type -> storage.FetchMessagesRequest
-	4,  // 20: storage.StorageService.AcknowledgeMessages:input_type -> storage.AcknowledgeMessagesRequest
-	0,  // 21: storage.StorageService.ClaimMessages:input_type -> storage.ClaimMessagesRequest
-	8,  // 22: storage.StorageService.WriteMessages:output_type -> storage.WriteMessagesResponse
-	10, // 23: storage.StorageService.CreatePartition:output_type -> storage.CreatePartitionResponse
-	13, // 24: storage.StorageService.GetPartition:output_type -> storage.GetPartitionResponse
-	15, // 25: storage.StorageService.ListPartitions:output_type -> storage.ListPartitionsResponse
-	17, // 26: storage.StorageService.SetTTL:output_type -> storage.SetTTLResponse
-	20, // 27: storage.StorageService.SaveConsumer:output_type -> storage.SaveConsumerResponse
-	22, // 28: storage.StorageService.GetConsumers:output_type -> storage.GetConsumersResponse
-	24, // 29: storage.StorageService.DeleteConsumer:output_type -> storage.DeleteConsumerResponse
-	26, // 30: storage.StorageService.UpdateGroupAssignment:output_type -> storage.UpdateGroupAssignmentResponse
-	28, // 31: storage.StorageService.GetGroupAssignment:output_type -> storage.GetGroupAssignmentResponse
-	3,  // 32: storage.StorageService.FetchMessages:output_type -> storage.FetchMessagesResponse
-	5,  // 33: storage.StorageService.AcknowledgeMessages:output_type -> storage.AcknowledgeMessagesResponse
-	1,  // 34: storage.StorageService.ClaimMessages:output_type -> storage.ClaimMessagesResponse
-	22, // [22:35] is the sub-list for method output_type
-	9,  // [9:22] is the sub-list for method input_type
+	17, // 13: storage.StorageService.SaveConsumer:input_type -> storage.SaveConsumerRequest
+	19, // 14: storage.StorageService.GetConsumers:input_type -> storage.GetConsumersRequest
+	21, // 15: storage.StorageService.DeleteConsumer:input_type -> storage.DeleteConsumerRequest
+	23, // 16: storage.StorageService.UpdateGroupAssignment:input_type -> storage.UpdateGroupAssignmentRequest
+	25, // 17: storage.StorageService.GetGroupAssignment:input_type -> storage.GetGroupAssignmentRequest
+	2,  // 18: storage.StorageService.FetchMessages:input_type -> storage.FetchMessagesRequest
+	4,  // 19: storage.StorageService.AcknowledgeMessages:input_type -> storage.AcknowledgeMessagesRequest
+	0,  // 20: storage.StorageService.ClaimMessages:input_type -> storage.ClaimMessagesRequest
+	8,  // 21: storage.StorageService.WriteMessages:output_type -> storage.WriteMessagesResponse
+	10, // 22: storage.StorageService.CreatePartition:output_type -> storage.CreatePartitionResponse
+	13, // 23: storage.StorageService.GetPartition:output_type -> storage.GetPartitionResponse
+	15, // 24: storage.StorageService.ListPartitions:output_type -> storage.ListPartitionsResponse
+	18, // 25: storage.StorageService.SaveConsumer:output_type -> storage.SaveConsumerResponse
+	20, // 26: storage.StorageService.GetConsumers:output_type -> storage.GetConsumersResponse
+	22, // 27: storage.StorageService.DeleteConsumer:output_type -> storage.DeleteConsumerResponse
+	24, // 28: storage.StorageService.UpdateGroupAssignment:output_type -> storage.UpdateGroupAssignmentResponse
+	26, // 29: storage.StorageService.GetGroupAssignment:output_type -> storage.GetGroupAssignmentResponse
+	3,  // 30: storage.StorageService.FetchMessages:output_type -> storage.FetchMessagesResponse
+	5,  // 31: storage.StorageService.AcknowledgeMessages:output_type -> storage.AcknowledgeMessagesResponse
+	1,  // 32: storage.StorageService.ClaimMessages:output_type -> storage.ClaimMessagesResponse
+	21, // [21:33] is the sub-list for method output_type
+	9,  // [9:21] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -1960,7 +1844,7 @@ func file_proto_storage_storage_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_storage_storage_proto_rawDesc), len(file_proto_storage_storage_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
