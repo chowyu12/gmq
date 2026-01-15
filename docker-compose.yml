@@ -1,5 +1,5 @@
 services:
-  # DragonflyDB - 高性能 Redis 兼容存储
+  # DragonflyDB - High-performance Redis-compatible storage
   dragonfly:
     image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
     container_name: gmq-dragonfly
@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Storage Service - 存储服务 (负责对接 Dragonfly)
+  # Storage Service - Storage service (responsible for对接 Dragonfly)
   storage:
     build:
       context: .
@@ -39,7 +39,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # Broker Service - 连接 + 分发服务
+  # Broker Service - Connection + distribution service
   broker:
     build:
       context: .
@@ -70,7 +70,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # Admin Service - 管理控制台
+  # Admin Service - Management console
   admin:
     build:
       context: .
