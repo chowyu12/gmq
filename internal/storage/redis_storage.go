@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/chowyu12/gmq/pkg/log"
@@ -14,8 +15,9 @@ import (
 
 // RedisStorage implements storage using Redis/DragonflyDB
 type RedisStorage struct {
-	client    *redis.Client
-	globalTTL time.Duration
+	client     *redis.Client
+	globalTTL  time.Duration
+	writeCount atomic.Uint64
 }
 
 func NewRedisStorage(addr string, password string, db int, globalTTL time.Duration) (*RedisStorage, error) {
@@ -86,7 +88,7 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 	for i, msg := range msgs {
 		key := r.streamKey(msg.Topic, msg.PartitionID)
 
-		// Optimization: Store raw binary data using proto.Marshal instead of JSON
+		// Optimization 1: Store raw binary data using proto.Marshal instead of JSON
 		// This achieves near zero-copy and reduces CPU overhead
 		args := &redis.XAddArgs{
 			Stream: key,
@@ -95,12 +97,15 @@ func (r *RedisStorage) WriteMessages(ctx context.Context, msgs []*Message) ([]in
 			Approx: true,
 		}
 
-		// Apply Global TTL
-		if r.globalTTL > 0 {
+		// Optimization 4: Improved Sampled Trimming
+		// Use a global atomic counter to ensure trimming happens even with small batches
+		count := r.writeCount.Add(1)
+		if r.globalTTL > 0 && (count%100 == 0) {
 			// Redis Stream MinID allows automatic cleanup of old messages by timestamp
 			// Redis ID is timestamp-sequence, so we can calculate MinID as (now - TTL)
 			minID := time.Now().Add(-r.globalTTL).UnixMilli()
 			args.MinID = fmt.Sprintf("%d-0", minID)
+			r.writeCount.Store(0)
 		}
 
 		results[i] = pipe.XAdd(ctx, args)
@@ -179,6 +184,7 @@ func (r *RedisStorage) FetchMessages(ctx context.Context, group, topic string, c
 				PartitionID: partitionID,
 				Offset:      encodeOffset(xmsg.ID),
 			}
+
 			if data, ok := xmsg.Values["d"].(string); ok {
 				msg.Payload = []byte(data)
 				messages = append(messages, msg)
@@ -258,6 +264,7 @@ func (r *RedisStorage) ClaimMessages(ctx context.Context, group, topic, consumer
 			PartitionID: partitionID,
 			Offset:      encodeOffset(xmsg.ID),
 		}
+
 		if data, ok := xmsg.Values["d"].(string); ok {
 			msg.Payload = []byte(data)
 			messages = append(messages, msg)

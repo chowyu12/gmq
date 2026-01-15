@@ -461,7 +461,13 @@ func main() {
 	flag.Parse()
 	log.Init(*logLevel)
 	rand.Seed(time.Now().UnixNano())
-	conn, err := grpc.Dial(*storageAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Optimization 2: Optimize gRPC dial configuration
+	conn, err := grpc.Dial(*storageAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithInitialWindowSize(1<<24),     // 16MB
+		grpc.WithInitialConnWindowSize(1<<24), // 16MB
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
+	)
 	if err != nil {
 		log.Error("Failed to connect to storage service", "error", err, "addr", *storageAddr)
 		os.Exit(1)

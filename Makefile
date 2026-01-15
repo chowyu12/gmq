@@ -19,16 +19,17 @@ proto:
 	@echo "✓ Code generation completed"
 
 # Compile distributed services
+# Optimization 6: Use -ldflags="-s -w" to reduce binary size
 build: proto
 	@echo "Building distributed services..."
 	@mkdir -p bin
-	@go build -o bin/gmq-storage-service cmd/storage-service/main.go
-	@go build -o bin/gmq-broker-service cmd/broker-service/main.go
-	@go build -o bin/gmq-admin-service cmd/admin-service/main.go
+	@go build -ldflags="-s -w" -o bin/gmq-storage-service cmd/storage-service/main.go
+	@go build -ldflags="-s -w" -o bin/gmq-broker-service cmd/broker-service/main.go
+	@go build -ldflags="-s -w" -o bin/gmq-admin-service cmd/admin-service/main.go
 	@echo "Building examples..."
-	@go build -o bin/producer examples/producer/main.go
-	@go build -o bin/consumer_group examples/consumer_group/main.go
-	@go build -o bin/benchmark examples/benchmark/main.go
+	@go build -ldflags="-s -w" -o bin/producer examples/producer/main.go
+	@go build -ldflags="-s -w" -o bin/consumer_group examples/consumer_group/main.go
+	@go build -ldflags="-s -w" -o bin/benchmark examples/benchmark/main.go
 	@echo "✓ Build completed, binaries are in bin/ directory"
 
 # Docker orchestration
